@@ -1,4 +1,4 @@
-import { buildWhatsAppRaffleLink, formatCurrency, formatDate } from '../../utils/formatters'
+import { buildWhatsAppRaffleLink, formatDate } from '../../utils/formatters'
 import ImagePlaceholder from '../common/ImagePlaceholder'
 import PageHeading from '../common/PageHeading'
 import StatusBadge from '../common/StatusBadge'
@@ -62,27 +62,12 @@ export default function ActiveRaffleSection({ raffle }) {
               </div>
             </div>
             <div className="card-dashed-blue p-5 md:col-span-2">
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                 <SummaryItem label="Total" value={raffle.summary.total} />
                 <SummaryItem label="Disponibles" value={raffle.summary.availableCount} />
                 <SummaryItem label="Apartados" value={raffle.summary.reservedCount} />
                 <SummaryItem label="Pagados" value={raffle.summary.paidCount} />
-                <SummaryItem
-                  label="Ganador"
-                  value={winner?.number || raffle.summary.winnerCount || 'Sin ganador'}
-                />
-                <SummaryItem
-                  label="Ingreso pagado"
-                  value={formatCurrency(raffle.summary.paidRevenue)}
-                />
-                <SummaryItem
-                  label="Ingreso pendiente"
-                  value={formatCurrency(raffle.summary.pendingRevenue)}
-                />
-                <SummaryItem
-                  label="Ingreso total esperado"
-                  value={formatCurrency(raffle.summary.potentialRevenue)}
-                />
+                {winner ? <SummaryItem label="Ganador" value={winner.number} /> : null}
               </div>
             </div>
             <div className="card-dashed-rose p-5 md:col-span-2">
