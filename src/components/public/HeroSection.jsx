@@ -48,10 +48,10 @@ export default function HeroSection() {
             </div>
             <div className="card-dashed-green p-6 sm:col-span-2">
               <p className="text-xs uppercase tracking-[0.35em] text-slate-500">
-                Catalogo administrable
+                Colecciones Cataela
               </p>
               <p className="mt-3 font-display text-3xl text-slate-700">
-                Una web lista para crecer con productos, imagenes y rifas.
+                Una selección cuidada de velas artesanales, listas para regalar y decorar.
               </p>
             </div>
           </div>
