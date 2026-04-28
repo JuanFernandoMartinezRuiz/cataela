@@ -1,4 +1,4 @@
-import { buildWhatsAppRaffleLink, formatDate } from '../../utils/formatters'
+import { buildWhatsAppRaffleLink, formatCurrency, formatDate } from '../../utils/formatters'
 import ImagePlaceholder from '../common/ImagePlaceholder'
 import PageHeading from '../common/PageHeading'
 import StatusBadge from '../common/StatusBadge'
