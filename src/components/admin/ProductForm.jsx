@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import CategoryModal from './CategoryModal'
 import ImagePlaceholder from '../common/ImagePlaceholder'
 
 const initialState = {
@@ -16,8 +17,11 @@ export default function ProductForm({
   existingGallery,
   loading,
   saving,
+  saveLabel,
+  warning,
   onSubmit,
   onDeleteImage,
+  onCreateCategory,
 }) {
   const [formValues, setFormValues] = useState(initialState)
   const [mainImageFile, setMainImageFile] = useState(null)
@@ -25,6 +29,8 @@ export default function ProductForm({
   const [galleryFiles, setGalleryFiles] = useState([])
   const [galleryPreviews, setGalleryPreviews] = useState([])
   const [error, setError] = useState('')
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
+  const [savingCategory, setSavingCategory] = useState(false)
 
   useEffect(() => {
     if (!initialValues) {
@@ -95,10 +101,21 @@ export default function ProductForm({
     }
   }
 
+  async function handleCreateCategory(name) {
+    setSavingCategory(true)
+
+    try {
+      return await onCreateCategory(name)
+    } finally {
+      setSavingCategory(false)
+    }
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="admin-panel p-6">
-        <div className="grid gap-5 md:grid-cols-2">
+    <>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="admin-panel p-6">
+          <div className="grid gap-5 md:grid-cols-2">
           <Field label="Nombre">
             <input
               value={formValues.name}
@@ -108,128 +125,147 @@ export default function ProductForm({
             />
           </Field>
 
-          <Field label="Categoria">
-            <select
-              value={formValues.categoryId}
-              onChange={(event) => updateValue('categoryId', event.target.value)}
-              className="field-input"
-            >
-              <option value="">Selecciona una categoria</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Precio (COP)">
-            <input
-              type="number"
-              min="0"
-              value={formValues.price}
-              onChange={(event) => updateValue('price', event.target.value)}
-              className="field-input"
-              placeholder="20000"
-            />
-          </Field>
-
-          <Field label="Estado">
-            <label className="flex h-full items-center gap-3 rounded-2xl border border-sand/60 bg-white/85 px-4 py-3">
-              <input
-                type="checkbox"
-                checked={formValues.isActive}
-                onChange={(event) => updateValue('isActive', event.target.checked)}
-              />
-              <span className="text-sm text-slate-700">
-                Producto activo en el catalogo publico
-              </span>
-            </label>
-          </Field>
-        </div>
-
-        <Field label="Descripcion" className="mt-5">
-          <textarea
-            rows="5"
-            value={formValues.description}
-            onChange={(event) => updateValue('description', event.target.value)}
-            className="field-input"
-            placeholder="Describe aroma, detalles y uso ideal."
-          />
-        </Field>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <div className="admin-panel p-6">
-          <Field label="Foto principal">
-            <input type="file" accept="image/*" onChange={handleMainImageChange} className="field-input" />
-          </Field>
-
-          <div className="mt-5">
-            {mainPreview ? (
-              <img
-                src={mainPreview}
-                alt="Vista previa principal"
-                className="h-72 w-full rounded-[1.75rem] object-cover"
-              />
-            ) : (
-              <ImagePlaceholder label="Foto principal" className="h-72 w-full" />
-            )}
-          </div>
-        </div>
-
-        <div className="admin-panel p-6">
-          <Field label="Galeria adicional">
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleGalleryChange}
-              className="field-input"
-            />
-          </Field>
-
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            {existingGallery.map((image) => (
-              <div key={image.id} className="rounded-[1.5rem] border border-dashed border-sand bg-petal/75 p-3">
-                <img
-                  src={image.image_url}
-                  alt="Imagen adicional"
-                  className="h-36 w-full rounded-[1.25rem] object-cover"
-                />
+            <Field label="Categoria">
+              <div className="flex flex-col gap-3">
+                <select
+                  value={formValues.categoryId}
+                  onChange={(event) => updateValue('categoryId', event.target.value)}
+                  className="field-input"
+                >
+                  <option value="">Selecciona una categoria</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="button"
-                  onClick={() => onDeleteImage(image)}
-                  className="btn-ghost mt-3 w-full"
+                  onClick={() => setIsCategoryModalOpen(true)}
+                  className="btn-secondary self-start"
                 >
-                  Eliminar imagen
+                  Nueva categoria
                 </button>
               </div>
-            ))}
+            </Field>
 
-            {galleryPreviews.map((preview) => (
-              <img
-                key={preview}
-                src={preview}
-                alt="Vista previa de galeria"
-                className="h-36 w-full rounded-[1.25rem] object-cover"
+            <Field label="Precio (COP)">
+              <input
+                type="number"
+                min="0"
+                value={formValues.price}
+                onChange={(event) => updateValue('price', event.target.value)}
+                className="field-input"
+                placeholder="20000"
               />
-            ))}
+            </Field>
+
+            <Field label="Estado">
+              <label className="flex h-full items-center gap-3 rounded-2xl border border-sand/60 bg-white/85 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={formValues.isActive}
+                  onChange={(event) => updateValue('isActive', event.target.checked)}
+                />
+                <span className="text-sm text-slate-700">
+                  Producto activo en el catalogo publico
+                </span>
+              </label>
+            </Field>
+          </div>
+
+          <Field label="Descripcion" className="mt-5">
+            <textarea
+              rows="5"
+              value={formValues.description}
+              onChange={(event) => updateValue('description', event.target.value)}
+              className="field-input"
+              placeholder="Describe aroma, detalles y uso ideal."
+            />
+          </Field>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+          <div className="admin-panel p-6">
+            <Field label="Foto principal">
+              <input type="file" accept="image/*" onChange={handleMainImageChange} className="field-input" />
+            </Field>
+
+            <div className="mt-5">
+              {mainPreview ? (
+                <img
+                  src={mainPreview}
+                  alt="Vista previa principal"
+                  className="h-72 w-full rounded-[1.75rem] object-cover"
+                />
+              ) : (
+                <ImagePlaceholder label="Foto principal" className="h-72 w-full" />
+              )}
+            </div>
+          </div>
+
+          <div className="admin-panel p-6">
+            <Field label="Galeria adicional">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleGalleryChange}
+                className="field-input"
+              />
+            </Field>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {existingGallery.map((image) => (
+                <div key={image.id} className="rounded-[1.5rem] border border-dashed border-sand bg-petal/75 p-3">
+                  <img
+                    src={image.image_url}
+                    alt="Imagen adicional"
+                    className="h-36 w-full rounded-[1.25rem] object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onDeleteImage(image)}
+                    className="btn-ghost mt-3 w-full"
+                  >
+                    Eliminar imagen
+                  </button>
+                </div>
+              ))}
+
+              {galleryPreviews.map((preview) => (
+                <img
+                  key={preview}
+                  src={preview}
+                  alt="Vista previa de galeria"
+                  className="h-36 w-full rounded-[1.25rem] object-cover"
+                />
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {error ? <p className="text-sm text-rose-700">{error}</p> : null}
+        {error ? <p className="text-sm text-rose-700">{error}</p> : null}
+        {!error && warning ? <p className="text-sm text-amber-700">{warning}</p> : null}
 
-      <div className="flex flex-wrap gap-3">
-        <button type="submit" disabled={saving || loading} className="btn-primary">
-          {saving ? 'Guardando...' : 'Guardar producto'}
-        </button>
-        <Link to="/admin/productos" className="btn-secondary">
-          Cancelar
-        </Link>
-      </div>
-    </form>
+        <div className="flex flex-wrap gap-3">
+          <button type="submit" disabled={saving || loading} className="btn-primary">
+            {saving ? saveLabel || 'Guardando producto...' : 'Guardar producto'}
+          </button>
+          <Link to="/admin/productos" className="btn-secondary">
+            Cancelar
+          </Link>
+        </div>
+      </form>
+
+      <CategoryModal
+        open={isCategoryModalOpen}
+        saving={savingCategory}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onCreateCategory={handleCreateCategory}
+        onCreated={(category) => updateValue('categoryId', category.id)}
+      />
+    </>
   )
 }
 

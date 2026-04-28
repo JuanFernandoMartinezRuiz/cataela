@@ -6,7 +6,8 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
 export const supabaseBuckets = {
-  productImages: 'product-images',
+  productImages: 'products',
+  raffleImages: 'raffles',
 }
 
 export const supabase = createClient(

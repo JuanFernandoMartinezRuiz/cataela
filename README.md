@@ -7,6 +7,7 @@ Web dinamica hecha con React + Vite + Tailwind para el emprendimiento Cataela, c
 - React + Vite
 - Tailwind CSS
 - React Router DOM
+- Recharts
 - Supabase Auth
 - Supabase Database
 - Supabase Storage
@@ -21,6 +22,7 @@ Web dinamica hecha con React + Vite + Tailwind para el emprendimiento Cataela, c
 - `/admin/productos` lista de productos
 - `/admin/productos/nuevo` crear producto
 - `/admin/productos/:id` editar producto
+- `/admin/finanzas` gestion financiera
 - `/admin/rifas` gestion de rifas
 
 ## Variables de entorno
@@ -61,6 +63,9 @@ Ese archivo crea:
 - `product_images`
 - `raffles`
 - `raffle_numbers`
+- `raffle_images`
+- `finance_transactions`
+- `finance_categories`
 
 Tambien agrega:
 
@@ -76,6 +81,13 @@ Ese bucket guarda:
 
 - foto principal del producto
 - imagenes adicionales del producto
+
+Crea tambien un bucket publico llamado `raffles`.
+
+Ese bucket guarda:
+
+- foto principal del premio de la rifa
+- imagenes adicionales del sorteo
 
 ### 3. Crear usuario admin
 
@@ -99,6 +111,8 @@ Puedes adaptar las politicas segun tus roles reales de administracion.
 - `src/services/productService.js`: CRUD de productos
 - `src/services/imageService.js`: subidas y borrado de imagenes en Storage
 - `src/services/raffleService.js`: CRUD de rifas y numeros
+- `src/services/imageService.js`: tambien gestiona imagenes de rifas y sorteos
+- `src/services/financeService.js`: CRUD de ingresos, egresos y pendientes
 - `src/services/authService.js`: login, sesion y logout
 
 Hay comentarios puntuales en los servicios donde se conectan las operaciones reales a Supabase.

@@ -5,6 +5,8 @@ import { useAuth } from '../providers/AuthProvider'
 const links = [
   { to: '/admin', label: 'Dashboard', end: true },
   { to: '/admin/productos', label: 'Productos' },
+  { to: '/admin/categorias', label: 'Categorias' },
+  { to: '/admin/finanzas', label: 'Finanzas' },
   { to: '/admin/rifas', label: 'Rifas' },
 ]
 

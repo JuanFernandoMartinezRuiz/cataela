@@ -5,7 +5,7 @@ export default function PublicNavbar({ activeRaffle }) {
     { to: '/', label: 'Inicio', end: true },
     { to: '/catalogo', label: 'Catalogo' },
     ...(activeRaffle ? [{ href: '/#sorteo', label: 'Sorteo' }] : []),
-    { to: '/admin/login', label: 'Admin' },
+    { href: '/#contacto', label: 'Contacto' },
   ]
 
   return (

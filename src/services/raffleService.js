@@ -1,4 +1,5 @@
 import { ensureSupabaseConfigured, supabase } from '../lib/supabaseClient'
+import { fetchRaffleImages } from './imageService'
 
 export const raffleNumberStatuses = ['available', 'reserved', 'paid', 'winner']
 export const raffleStatuses = ['draft', 'active', 'closed']
@@ -49,6 +50,31 @@ export async function fetchRaffles() {
   return data ?? []
 }
 
+export async function fetchRaffleById(id) {
+  ensureSupabaseConfigured()
+
+  const { data, error } = await supabase
+    .from('raffles')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  if (!data) {
+    return null
+  }
+
+  const gallery = await fetchRaffleImages(id)
+
+  return {
+    ...data,
+    gallery,
+  }
+}
+
 export async function fetchRaffleNumbers(raffleId) {
   ensureSupabaseConfigured()
 
@@ -85,10 +111,14 @@ export async function fetchActiveRaffle() {
   }
 
   const numbers = await fetchRaffleNumbers(data.id)
+  const gallery = await fetchRaffleImages(data.id)
+  const winner = numbers.find((number) => number.status === 'winner') || null
 
   return {
     ...data,
     numbers,
+    gallery,
+    winner,
     summary: buildRaffleSummary(data, numbers),
   }
 }
@@ -159,9 +189,34 @@ export async function updateRaffle(id, payload) {
 export async function updateRaffleNumber(id, payload) {
   ensureSupabaseConfigured()
 
+  if (!payload.raffle_id) {
+    throw new Error('Se requiere raffle_id para actualizar el numero de rifa.')
+  }
+
+  if (payload.status === 'winner') {
+    const { error: clearPreviousWinnerError } = await supabase
+      .from('raffle_numbers')
+      .update({
+        status: 'paid',
+        paid_at: new Date().toISOString(),
+      })
+      .eq('raffle_id', payload.raffle_id)
+      .eq('status', 'winner')
+      .neq('id', id)
+
+    if (clearPreviousWinnerError) {
+      throw clearPreviousWinnerError
+    }
+  }
+
   const nextPayload = {
-    ...payload,
-    paid_at: payload.status === 'paid' ? new Date().toISOString() : null,
+    status: payload.status,
+    buyer_name: payload.buyer_name || null,
+    buyer_phone: payload.buyer_phone || null,
+    paid_at:
+      payload.status === 'paid' || payload.status === 'winner'
+        ? new Date().toISOString()
+        : null,
   }
 
   // Supabase update for each raffle number state and buyer info.
@@ -174,6 +229,28 @@ export async function updateRaffleNumber(id, payload) {
 
   if (error) {
     throw error
+  }
+
+  const { data: currentWinner, error: winnerLookupError } = await supabase
+    .from('raffle_numbers')
+    .select('number')
+    .eq('raffle_id', payload.raffle_id)
+    .eq('status', 'winner')
+    .maybeSingle()
+
+  if (winnerLookupError) {
+    throw winnerLookupError
+  }
+
+  const { error: raffleSyncError } = await supabase
+    .from('raffles')
+    .update({
+      winner_number: currentWinner?.number || null,
+    })
+    .eq('id', payload.raffle_id)
+
+  if (raffleSyncError) {
+    throw raffleSyncError
   }
 
   return data

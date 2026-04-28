@@ -7,6 +7,9 @@ const colorMap = {
   winner: 'bg-rose text-slate-700',
   draft: 'bg-sand/50 text-slate-700',
   closed: 'bg-slate-200 text-slate-700',
+  completed: 'bg-sage text-slate-700',
+  pending: 'bg-sun text-slate-700',
+  partial: 'bg-blush text-slate-700',
 }
 
 export default function StatusBadge({ children, tone = 'inactive' }) {

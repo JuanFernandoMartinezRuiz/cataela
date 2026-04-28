@@ -43,7 +43,7 @@ export default function HeroSection() {
             <div className="rounded-[1.75rem] border border-dashed border-mist/60 bg-mist/15 p-5">
               <p className="font-display text-3xl text-slate-700">Aromas</p>
               <p className="mt-3 text-sm leading-6 text-slate-500">
-                Vainilla, lavanda y manzana verde en composiciones suaves.
+                Vainilla, lavanda, frutos rojos, fresa, Maracuya, Manzana verde en composiciones suaves.
               </p>
             </div>
             <div className="rounded-[1.75rem] border border-dashed border-blush/80 bg-white/70 p-6 sm:col-span-2">

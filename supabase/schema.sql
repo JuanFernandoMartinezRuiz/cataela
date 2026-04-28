@@ -33,6 +33,7 @@ create table if not exists public.raffles (
   prize text not null,
   description text,
   price_per_number numeric not null default 0,
+  main_image_url text,
   status text not null default 'draft',
   draw_date date,
   winner_number text,
@@ -50,6 +51,38 @@ create table if not exists public.raffle_numbers (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.raffle_images (
+  id uuid primary key default gen_random_uuid(),
+  raffle_id uuid not null references public.raffles(id) on delete cascade,
+  image_url text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.finance_transactions (
+  id uuid primary key default gen_random_uuid(),
+  type text not null check (type in ('income', 'expense')),
+  amount numeric not null default 0,
+  paid_amount numeric not null default 0,
+  remaining_amount numeric not null default 0,
+  description text not null,
+  category text,
+  payment_method text,
+  transaction_date date not null,
+  status text not null default 'completed' check (status in ('completed', 'pending', 'partial')),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.finance_categories (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  type text not null check (type in ('income', 'expense')),
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists finance_categories_name_type_unique
+  on public.finance_categories (name, type);
+
 create unique index if not exists raffle_numbers_unique_per_raffle
   on public.raffle_numbers (raffle_id, number);
 
@@ -58,3 +91,11 @@ values
   ('Velas en frasco', 'velas-en-frasco'),
   ('Velas florales', 'velas-florales')
 on conflict (slug) do nothing;
+
+insert into public.finance_categories (name, type)
+values
+  ('Ventas', 'income'),
+  ('Rifas', 'income'),
+  ('Insumos', 'expense'),
+  ('Envios', 'expense')
+on conflict (name, type) do nothing;

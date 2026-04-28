@@ -3,6 +3,8 @@ import ProtectedRoute from './components/admin/ProtectedRoute'
 import AdminLayout from './layouts/AdminLayout'
 import PublicLayout from './layouts/PublicLayout'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import AdminCategoriesPage from './pages/admin/AdminCategoriesPage'
+import AdminFinancePage from './pages/admin/AdminFinancePage'
 import AdminLoginPage from './pages/admin/AdminLoginPage'
 import AdminProductFormPage from './pages/admin/AdminProductFormPage'
 import AdminProductsPage from './pages/admin/AdminProductsPage'
@@ -36,6 +38,8 @@ export const appRouter = createBrowserRouter([
     children: [
       { index: true, element: <AdminDashboardPage /> },
       { path: 'productos', element: <AdminProductsPage /> },
+      { path: 'categorias', element: <AdminCategoriesPage /> },
+      { path: 'finanzas', element: <AdminFinancePage /> },
       { path: 'productos/nuevo', element: <AdminProductFormPage /> },
       { path: 'productos/:id', element: <AdminProductFormPage /> },
       { path: 'rifas', element: <AdminRafflesPage /> },

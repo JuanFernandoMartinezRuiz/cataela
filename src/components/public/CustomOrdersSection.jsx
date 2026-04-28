@@ -4,7 +4,7 @@ const options = [
   'Aromas disponibles: Vainilla, Lavanda, Manzana verde',
   'Colores personalizados',
   'Aromas a eleccion',
-  'Disenos especiales',
+  'Diseños especiales',
 ]
 
 export default function CustomOrdersSection() {

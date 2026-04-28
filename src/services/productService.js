@@ -34,6 +34,14 @@ function normalizeProduct(product) {
   }
 }
 
+function mapProductError(error) {
+  if (error?.code === '23505' && String(error.message || '').includes('slug')) {
+    return new Error('Ya existe un producto con ese nombre.')
+  }
+
+  return error
+}
+
 export async function fetchPublicProducts() {
   ensureSupabaseConfigured()
 
@@ -44,7 +52,7 @@ export async function fetchPublicProducts() {
     .order('created_at', { ascending: false })
 
   if (error) {
-    throw error
+    throw mapProductError(error)
   }
 
   return (data ?? []).map(normalizeProduct)
@@ -59,7 +67,7 @@ export async function fetchAdminProducts() {
     .order('created_at', { ascending: false })
 
   if (error) {
-    throw error
+    throw mapProductError(error)
   }
 
   return (data ?? []).map(normalizeProduct)

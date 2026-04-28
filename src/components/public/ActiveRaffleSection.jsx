@@ -1,72 +1,127 @@
 import { buildWhatsAppRaffleLink, formatCurrency, formatDate } from '../../utils/formatters'
+import ImagePlaceholder from '../common/ImagePlaceholder'
 import PageHeading from '../common/PageHeading'
 import StatusBadge from '../common/StatusBadge'
 
 export default function ActiveRaffleSection({ raffle }) {
   const numbers = raffle.numbers ?? []
+  const gallery = raffle.gallery ?? []
+  const winner = raffle.winner
+  const hasImages = Boolean(raffle.main_image_url || gallery.length)
 
   return (
     <section id="sorteo" className="page-section">
-      <div className="card-soft grid gap-6 p-6 md:p-8 lg:grid-cols-[0.85fr_1.15fr]">
-        <PageHeading
-          eyebrow="Rifa activa"
-          title={raffle.title}
-          description={raffle.description || 'Participa en la rifa activa de Cataela y reserva tu numero favorito.'}
-          actions={
-            <a
-              href={buildWhatsAppRaffleLink(raffle.title)}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-primary"
-            >
-              Pedir numero por WhatsApp
-            </a>
-          }
-        />
+      <div className="card-soft grid gap-5 p-6 md:p-8 lg:grid-cols-[1.02fr_0.98fr]">
+        <div className="space-y-4">
+          <PageHeading
+            eyebrow="Rifa activa"
+            title={raffle.title}
+            description={
+              raffle.description ||
+              'Participa en la rifa activa de Cataela y reserva tu numero favorito.'
+            }
+            actions={
+              <a
+                href={buildWhatsAppRaffleLink(raffle.title)}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-primary"
+              >
+                Pedir numero por WhatsApp
+              </a>
+            }
+          />
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="card-dashed p-5">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Premio</p>
-            <p className="mt-2 font-display text-3xl text-slate-700">{raffle.prize}</p>
-          </div>
-          <div className="card-dashed p-5">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Valor por numero</p>
-            <p className="mt-2 font-display text-3xl text-slate-700">
-              {formatCurrency(raffle.price_per_number)}
-            </p>
-          </div>
-          <div className="card-dashed p-5">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Sorteo</p>
-            <p className="mt-2 font-display text-3xl text-slate-700">
-              {formatDate(raffle.draw_date)}
-            </p>
-          </div>
-          <div className="card-dashed p-5">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Estado</p>
-            <div className="mt-3">
-              <StatusBadge tone={raffle.status}>{raffle.status}</StatusBadge>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="card-dashed p-5">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Premio</p>
+              <p className="mt-2 font-display text-3xl text-slate-700">{raffle.prize}</p>
             </div>
-          </div>
-          <div className="card-dashed p-5 md:col-span-2">
-            <div className="grid gap-4 sm:grid-cols-4">
-              <SummaryItem label="Total" value={raffle.summary.total} />
-              <SummaryItem label="Disponibles" value={raffle.summary.availableCount} />
-              <SummaryItem label="Apartados" value={raffle.summary.reservedCount} />
-              <SummaryItem label="Pagados" value={raffle.summary.paidCount} />
+            <div className="card-dashed p-5">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Valor por numero</p>
+              <p className="mt-2 font-display text-3xl text-slate-700">
+                {formatCurrency(raffle.price_per_number)}
+              </p>
             </div>
-          </div>
-          <div className="card-dashed p-5 md:col-span-2">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Estados</p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <LegendItem label="Disponible" tone="available" />
-              <LegendItem label="Apartado" tone="reserved" />
-              <LegendItem label="Pagado" tone="paid" />
-              <LegendItem label="Ganador" tone="winner" />
+            <div className="card-dashed p-5">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Sorteo</p>
+              <p className="mt-2 font-display text-3xl text-slate-700">
+                {formatDate(raffle.draw_date)}
+              </p>
             </div>
+            <div className="card-dashed p-5">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Estado</p>
+              <div className="mt-3">
+                <StatusBadge tone={raffle.status}>{raffle.status}</StatusBadge>
+              </div>
+            </div>
+            <div className="card-dashed p-5 md:col-span-2">
+              <div className="grid gap-4 sm:grid-cols-4">
+                <SummaryItem label="Total" value={raffle.summary.total} />
+                <SummaryItem label="Disponibles" value={raffle.summary.availableCount} />
+                <SummaryItem label="Apartados" value={raffle.summary.reservedCount} />
+                <SummaryItem label="Pagados" value={raffle.summary.paidCount} />
+              </div>
+            </div>
+            <div className="card-dashed p-5 md:col-span-2">
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Estados</p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <LegendItem label="Disponible" tone="available" />
+                <LegendItem label="Apartado" tone="reserved" />
+                <LegendItem label="Pagado" tone="paid" />
+                <LegendItem label="Ganador" tone="winner" />
+              </div>
+            </div>
+            {winner ? (
+              <div className="rounded-[1.75rem] border border-dashed border-sand bg-gradient-to-br from-rose/40 via-white to-sun/45 p-5 shadow-soft md:col-span-2">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
+                  Resultado del sorteo
+                </p>
+                <div className="mt-3 space-y-2">
+                  {winner.buyer_name ? (
+                    <p className="font-display text-3xl text-slate-700">
+                      Felicitaciones, {winner.buyer_name}
+                    </p>
+                  ) : null}
+                  <p className="text-base font-semibold text-slate-600">
+                    Numero ganador: {winner.number}
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
-        <div className="rounded-[1.75rem] border border-dashed border-sand bg-gradient-to-br from-white/75 to-mist/10 p-5 md:col-span-2 lg:col-span-1">
+        <div className="space-y-4 lg:pt-1">
+          {hasImages ? (
+            <div className="rounded-[1.75rem] border border-dashed border-sand bg-white/70 p-5 shadow-soft">
+              {raffle.main_image_url ? (
+                <img
+                  src={raffle.main_image_url}
+                  alt={raffle.prize}
+                  className="h-72 w-full rounded-[1.5rem] object-cover"
+                />
+              ) : (
+                <ImagePlaceholder label={raffle.prize} className="h-72 w-full" />
+              )}
+
+              {gallery.length ? (
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {gallery.map((image) => (
+                    <img
+                      key={image.id}
+                      src={image.image_url}
+                      alt={`Detalle de ${raffle.title}`}
+                      className="h-28 w-full rounded-[1.25rem] object-cover"
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-[1.75rem] border border-dashed border-sand bg-gradient-to-br from-white/75 to-mist/10 p-5 lg:col-span-2">
           <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
             Numeros disponibles de la rifa
           </p>

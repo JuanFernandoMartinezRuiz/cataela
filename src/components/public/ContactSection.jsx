@@ -25,7 +25,7 @@ const links = [
 
 export default function ContactSection() {
   return (
-    <section className="page-section">
+    <section id="contacto" className="page-section">
       <div className="card-soft p-6 md:p-8">
         <PageHeading
           eyebrow="Contacto"
