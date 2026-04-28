@@ -1,7 +1,7 @@
 import PageHeading from '../common/PageHeading'
 
 const options = [
-  'Aromas disponibles: Vainilla, Lavanda, Manzana verde',
+  'Vainilla, lavanda, frutos rojos, fresa, Maracuya, Manzana verde en composiciones suaves.',
   'Colores personalizados',
   'Aromas a eleccion',
   'Diseños especiales',
