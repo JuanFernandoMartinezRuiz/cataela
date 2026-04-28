@@ -73,10 +73,11 @@ export default function FinanceCategoryModal({
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="field-input"
+              className={`field-input ${error ? 'field-input-error' : ''}`}
               placeholder="Ej. Ferias, empaques, publicidad"
               autoFocus
             />
+            {error ? <p className="field-error">{error}</p> : null}
           </div>
 
           <div>
@@ -91,10 +92,12 @@ export default function FinanceCategoryModal({
             </select>
           </div>
 
-          {error ? <p className="text-sm text-rose-700">{error}</p> : null}
-
           <div className="flex flex-wrap gap-3">
-            <button type="submit" disabled={saving} className="btn-primary">
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn-primary disabled:cursor-not-allowed disabled:opacity-70"
+            >
               {saving ? 'Guardando...' : 'Guardar categoria'}
             </button>
             <button type="button" onClick={handleClose} className="btn-secondary">

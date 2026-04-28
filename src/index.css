@@ -15,7 +15,7 @@
     font-family: 'Nunito Sans', sans-serif;
     background:
       radial-gradient(circle at top left, rgba(255, 255, 255, 0.85), transparent 30%),
-      radial-gradient(circle at bottom right, rgba(242, 214, 217, 0.3), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(236, 218, 221, 0.16), transparent 30%),
       #f8f1e8;
     color: #4d5661;
   }
@@ -51,31 +51,67 @@
   }
 
   .card-dashed {
-    @apply rounded-[1.75rem] border border-dashed border-sand bg-petal/75 shadow-soft;
+    @apply rounded-[1.75rem] border border-dashed border-mist/50 bg-white/80 shadow-soft;
+  }
+
+  .card-dashed-blue {
+    @apply rounded-[1.75rem] border border-dashed border-mist/60 bg-white/80 shadow-soft;
+  }
+
+  .card-dashed-green {
+    @apply rounded-[1.75rem] border border-dashed border-sageDeep/80 bg-white/80 shadow-soft;
+  }
+
+  .card-dashed-rose {
+    @apply rounded-[1.75rem] border border-dashed border-roseDeep/75 bg-white/80 shadow-soft;
   }
 
   .field-input {
     @apply w-full rounded-2xl border border-sand/60 bg-white/85 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-mist focus:ring-2 focus:ring-mist/20;
   }
 
+  .field-input-error {
+    @apply border-roseDeep/80 bg-white focus:border-roseDeep focus:ring-rose/20;
+  }
+
   .field-label {
     @apply mb-2 block text-sm font-semibold text-slate-600;
   }
 
+  .field-error {
+    @apply mt-2 text-sm text-roseDeep;
+  }
+
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-full bg-slate-700 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-slate-800;
+    @apply inline-flex items-center justify-center rounded-full bg-mist px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-mistDeep;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-full border border-dashed border-sand bg-white/80 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-white;
+    @apply inline-flex items-center justify-center rounded-full border border-dashed border-sand/80 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-mist/50 hover:bg-white;
   }
 
   .btn-ghost {
     @apply inline-flex items-center justify-center rounded-full border border-transparent px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white/70 hover:text-slate-900;
   }
 
+  .btn-danger {
+    @apply inline-flex items-center justify-center rounded-full border border-dashed border-dangerDeep/60 bg-danger/40 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-danger/50;
+  }
+
   .admin-panel {
     @apply rounded-[1.75rem] border border-white/70 bg-white/80 shadow-soft;
+  }
+
+  .filter-pill {
+    @apply rounded-full px-4 py-2 text-sm font-semibold transition;
+  }
+
+  .filter-pill-active {
+    @apply bg-mist text-white shadow-soft;
+  }
+
+  .filter-pill-idle {
+    @apply border border-dashed border-sand/80 bg-white/80 text-slate-600 hover:border-mist/45 hover:bg-white;
   }
 }
 
@@ -96,7 +132,7 @@ body {
   inset: 0;
   background-image:
     radial-gradient(circle at 12% 20%, rgba(169, 184, 200, 0.16) 0, transparent 18%),
-    radial-gradient(circle at 86% 18%, rgba(242, 214, 217, 0.24) 0, transparent 15%),
+    radial-gradient(circle at 86% 18%, rgba(236, 218, 221, 0.14) 0, transparent 15%),
     radial-gradient(circle at 10% 82%, rgba(221, 198, 178, 0.26) 0, transparent 18%),
     radial-gradient(circle at 92% 78%, rgba(169, 184, 200, 0.14) 0, transparent 18%);
   opacity: 0.9;
@@ -124,10 +160,22 @@ body {
   left: -16px;
   width: 64px;
   height: 64px;
-  background: rgba(242, 214, 217, 0.5);
+  background: rgba(234, 209, 217, 0.34);
   filter: blur(12px);
 }
 
 ::selection {
   background: rgba(169, 184, 200, 0.35);
+}
+
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) translateX(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) translateX(0);
+  }
 }

@@ -18,8 +18,17 @@ export default function CustomOrdersSection() {
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {options.map((option) => (
-            <div key={option} className="rounded-[1.5rem] border border-dashed border-sand bg-petal/80 p-5">
+          {options.map((option, index) => (
+            <div
+              key={option}
+              className={`p-5 ${
+                index % 3 === 0
+                  ? 'card-dashed-blue'
+                  : index % 3 === 1
+                    ? 'card-dashed-green'
+                    : 'card-dashed-rose'
+              }`}
+            >
               <p className="font-display text-2xl text-slate-700">{option}</p>
             </div>
           ))}

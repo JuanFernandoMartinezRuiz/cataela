@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import FinanceCategoryModal from './FinanceCategoryModal'
+import { useToast } from '../../providers/ToastProvider'
 
 const initialState = {
   type: 'income',
@@ -22,7 +23,9 @@ export default function FinanceForm({
   onCancelEdit,
   onCreateCategory,
 }) {
+  const { showToast } = useToast()
   const [formValues, setFormValues] = useState(initialState)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState('')
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
@@ -33,6 +36,7 @@ export default function FinanceForm({
         transaction_date: getTodayDate(),
       })
       setError('')
+      setFieldErrors({})
       return
     }
 
@@ -50,6 +54,7 @@ export default function FinanceForm({
       status: selectedTransaction.status,
     })
     setError('')
+    setFieldErrors({})
   }, [selectedTransaction])
 
   const helperText = useMemo(() => {
@@ -96,24 +101,59 @@ export default function FinanceForm({
       ...current,
       [field]: value,
     }))
+    setFieldErrors((current) => {
+      if (!current[field]) {
+        return current
+      }
+
+      const nextErrors = { ...current }
+      delete nextErrors[field]
+      return nextErrors
+    })
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    const nextFieldErrors = {}
 
-    if (
-      !formValues.description.trim() ||
-      !formValues.amount ||
-      !formValues.transaction_date ||
-      !formValues.category
-    ) {
-      setError('Completa descripcion, monto, categoria y fecha.')
+    if (!formValues.description.trim()) {
+      nextFieldErrors.description = 'Este campo es obligatorio.'
+    }
+
+    if (!formValues.amount) {
+      nextFieldErrors.amount = 'Este campo es obligatorio.'
+    }
+
+    if (!formValues.transaction_date) {
+      nextFieldErrors.transaction_date = 'Este campo es obligatorio.'
+    }
+
+    if (!formValues.category) {
+      nextFieldErrors.category = 'Este campo es obligatorio.'
+    }
+
+    if (Object.keys(nextFieldErrors).length) {
+      setFieldErrors(nextFieldErrors)
+      setError('Revisa los campos.')
+      showToast({
+        title: 'Revisa los campos',
+        description: 'Completa la informacion obligatoria del movimiento.',
+        tone: 'error',
+      })
       return
     }
 
+    setFieldErrors({})
+
     if (Number(formValues.amount) <= 0) {
+      setFieldErrors({ amount: 'El monto debe ser mayor que cero.' })
       setError('El monto debe ser mayor que cero.')
+      showToast({
+        title: 'Revisa los campos',
+        description: 'El monto debe ser mayor que cero.',
+        tone: 'error',
+      })
       return
     }
 
@@ -125,22 +165,50 @@ export default function FinanceForm({
 
     if (formValues.status === 'partial') {
       if (formValues.paid_amount === '' || formValues.paid_amount === null) {
+        setFieldErrors({ paid_amount: 'Este campo es obligatorio.' })
         setError('Ingresa el valor pagado para un movimiento parcial.')
+        showToast({
+          title: 'Revisa los campos',
+          description: 'Ingresa el valor pagado para un movimiento parcial.',
+          tone: 'error',
+        })
         return
       }
 
       paidAmount = Number(formValues.paid_amount)
 
-      if (paidAmount < 0) {
-        setError('El valor pagado no puede ser negativo.')
+      if (paidAmount <= 0) {
+        setFieldErrors({ paid_amount: 'Debe ser mayor que cero.' })
+        setError('El valor pagado debe ser mayor que cero.')
+        showToast({
+          title: 'Revisa los campos',
+          description: 'El valor pagado debe ser mayor que cero.',
+          tone: 'error',
+        })
         return
       }
 
       if (paidAmount > amount) {
+        setFieldErrors({ paid_amount: 'No puede ser mayor que el total.' })
         setError('El valor pagado no puede ser mayor que el valor total.')
+        showToast({
+          title: 'Revisa los campos',
+          description: 'El valor pagado no puede ser mayor que el total.',
+          tone: 'error',
+        })
         return
       }
 
+      if (paidAmount >= amount) {
+        setFieldErrors({ paid_amount: 'Debe ser menor que el total.' })
+        setError('Para un movimiento parcial, el valor pagado debe ser menor que el total.')
+        showToast({
+          title: 'Revisa los campos',
+          description: 'Para un movimiento parcial, el valor pagado debe ser menor que el total.',
+          tone: 'error',
+        })
+        return
+      }
     }
 
     try {
@@ -204,47 +272,47 @@ export default function FinanceForm({
           </select>
         </Field>
 
-          <Field label="Monto (COP)">
+          <Field label="Monto (COP)" error={fieldErrors.amount} required>
             <input
               type="number"
               min="0"
               step="1"
               value={formValues.amount}
               onChange={(event) => updateValue('amount', event.target.value)}
-              className="field-input"
+              className={getFieldInputClassName(fieldErrors.amount)}
               placeholder="25000"
             />
           </Field>
 
-          <Field label="Fecha">
+          <Field label="Fecha" error={fieldErrors.transaction_date} required>
             <input
               type="date"
               value={formValues.transaction_date}
               onChange={(event) => updateValue('transaction_date', event.target.value)}
-              className="field-input"
+              className={getFieldInputClassName(fieldErrors.transaction_date)}
             />
           </Field>
 
           {formValues.status === 'partial' ? (
-            <Field label="Valor pagado">
+            <Field label="Valor pagado" error={fieldErrors.paid_amount} required>
               <input
                 type="number"
                 min="0"
                 step="1"
                 value={formValues.paid_amount}
                 onChange={(event) => updateValue('paid_amount', event.target.value)}
-                className="field-input"
+                className={getFieldInputClassName(fieldErrors.paid_amount)}
                 placeholder="10000"
               />
             </Field>
           ) : null}
 
-          <Field label="Categoria">
+          <Field label="Categoria" error={fieldErrors.category} required>
             <div className="flex flex-col gap-3">
               <select
                 value={formValues.category}
                 onChange={(event) => updateValue('category', event.target.value)}
-                className="field-input"
+                className={getFieldInputClassName(fieldErrors.category)}
               >
                 <option value="">Selecciona una categoria</option>
                 {filteredCategories.map((category) => (
@@ -273,12 +341,12 @@ export default function FinanceForm({
           </Field>
         </div>
 
-        <Field label="Descripcion" className="mt-4">
+        <Field label="Descripcion" className="mt-4" error={fieldErrors.description} required>
           <textarea
             rows="4"
             value={formValues.description}
             onChange={(event) => updateValue('description', event.target.value)}
-            className="field-input"
+            className={getFieldInputClassName(fieldErrors.description)}
             placeholder="Describe el movimiento"
           />
         </Field>
@@ -292,7 +360,11 @@ export default function FinanceForm({
         {error ? <p className="mt-3 text-sm text-rose-700">{error}</p> : null}
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <button type="submit" disabled={saving} className="btn-primary">
+          <button
+            type="submit"
+            disabled={saving}
+            className="btn-primary disabled:cursor-not-allowed disabled:opacity-70"
+          >
             {saving ? saveLabel || 'Guardando movimiento...' : 'Guardar movimiento'}
           </button>
           {selectedTransaction ? (
@@ -315,13 +387,21 @@ export default function FinanceForm({
   )
 }
 
-function Field({ label, children, className = '' }) {
+function Field({ label, children, className = '', error = '', required = false }) {
   return (
     <div className={className}>
-      <label className="field-label">{label}</label>
+      <label className="field-label">
+        {label}
+        {required ? <span className="ml-1 text-rose-700">*</span> : null}
+      </label>
       {children}
+      {error ? <p className="field-error">{error}</p> : null}
     </div>
   )
+}
+
+function getFieldInputClassName(hasError) {
+  return `field-input ${hasError ? 'field-input-error' : ''}`.trim()
 }
 
 function getTodayDate() {

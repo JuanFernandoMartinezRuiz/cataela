@@ -5,7 +5,7 @@ export default function HeroSection() {
     <section className="page-section pt-16 md:pt-24">
       <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <div className="card-soft p-8 md:p-12">
-          <span className="inline-flex rounded-full border border-dashed border-sand bg-petal px-4 py-2 text-xs uppercase tracking-[0.35em] text-slate-500">
+          <span className="inline-flex rounded-full border border-dashed border-mist/55 bg-white/85 px-4 py-2 text-xs uppercase tracking-[0.35em] text-slate-500">
             Popayan, Colombia
           </span>
           <h1 className="mt-6 font-brand text-6xl text-slate-700 md:text-8xl">
@@ -32,21 +32,21 @@ export default function HeroSection() {
           </div>
         </div>
 
-        <div className="hero-showcase card-soft relative overflow-hidden bg-gradient-to-br from-white via-petal to-blush/60 p-6 md:p-8">
+        <div className="hero-showcase card-soft relative overflow-hidden bg-gradient-to-br from-white via-petal to-mist/18 p-6 md:p-8">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="card-dashed p-5">
+            <div className="card-dashed-rose p-5">
               <p className="font-display text-3xl text-slate-700">Ramos</p>
               <p className="mt-3 text-sm leading-6 text-slate-500">
                 Piezas delicadas para regalar, decorar y celebrar.
               </p>
             </div>
-            <div className="rounded-[1.75rem] border border-dashed border-mist/60 bg-mist/15 p-5">
+            <div className="card-dashed-blue bg-mist/12 p-5">
               <p className="font-display text-3xl text-slate-700">Aromas</p>
               <p className="mt-3 text-sm leading-6 text-slate-500">
                 Vainilla, lavanda, frutos rojos, fresa, Maracuya, Manzana verde en composiciones suaves.
               </p>
             </div>
-            <div className="rounded-[1.75rem] border border-dashed border-blush/80 bg-white/70 p-6 sm:col-span-2">
+            <div className="card-dashed-green p-6 sm:col-span-2">
               <p className="text-xs uppercase tracking-[0.35em] text-slate-500">
                 Catalogo administrable
               </p>

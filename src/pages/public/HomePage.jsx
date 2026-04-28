@@ -57,7 +57,7 @@ export default function HomePage() {
           <PageHeading
             eyebrow="Catalogo"
             title="Favoritos del momento"
-            description="Productos activos conectados con Supabase para que el catalogo siempre este actualizado."
+            description="Una selección de nuestras velas favoritas, hechas para acompañar tus momentos especiales."
           />
           <Link to="/catalogo" className="btn-secondary">
             Ver catalogo completo

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import ErrorState from '../../components/common/ErrorState'
 import LoadingState from '../../components/common/LoadingState'
 import PageHeading from '../../components/common/PageHeading'
+import { useToast } from '../../providers/ToastProvider'
 import {
   createCategory,
   deleteCategory,
@@ -12,13 +13,16 @@ import { slugify } from '../../utils/slugify'
 import { formatDate } from '../../utils/formatters'
 
 export default function AdminCategoriesPage() {
+  const { showToast } = useToast()
   const [categories, setCategories] = useState([])
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState('')
   const [editingName, setEditingName] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
 
   useEffect(() => {
     loadCategories()
@@ -42,17 +46,34 @@ export default function AdminCategoriesPage() {
 
     if (!newName.trim()) {
       setError('El nombre de la categoria no puede estar vacio.')
+      setFieldErrors({ newName: 'Este campo es obligatorio.' })
+      showToast({
+        title: 'Revisa los campos',
+        description: 'El nombre de la categoria es obligatorio.',
+        tone: 'error',
+      })
       return
     }
 
     try {
       setSaving(true)
       setError('')
+      setFieldErrors({})
       const category = await createCategory({ name: newName })
       setCategories((current) => [...current, category].sort(sortByName))
       setNewName('')
+      showToast({
+        title: 'Elemento guardado',
+        description: 'La categoria se creo correctamente.',
+        tone: 'success',
+      })
     } catch (saveError) {
       setError(saveError.message || 'No fue posible crear la categoria.')
+      showToast({
+        title: 'Error al guardar',
+        description: saveError.message || 'No fue posible crear la categoria.',
+        tone: 'error',
+      })
     } finally {
       setSaving(false)
     }
@@ -62,45 +83,73 @@ export default function AdminCategoriesPage() {
     setEditingId(category.id)
     setEditingName(category.name)
     setError('')
+    setFieldErrors({})
   }
 
   async function handleUpdateCategory(id) {
     if (!editingName.trim()) {
       setError('El nombre de la categoria no puede estar vacio.')
+      setFieldErrors({ editingName: 'Este campo es obligatorio.' })
+      showToast({
+        title: 'Revisa los campos',
+        description: 'El nombre de la categoria es obligatorio.',
+        tone: 'error',
+      })
       return
     }
 
     try {
       setSaving(true)
       setError('')
+      setFieldErrors({})
       const updated = await updateCategory(id, { name: editingName })
       setCategories((current) =>
         current.map((category) => (category.id === id ? updated : category)).sort(sortByName),
       )
       setEditingId('')
       setEditingName('')
+      showToast({
+        title: 'Elemento guardado',
+        description: 'La categoria se actualizo correctamente.',
+        tone: 'success',
+      })
     } catch (saveError) {
       setError(saveError.message || 'No fue posible actualizar la categoria.')
+      showToast({
+        title: 'Error al guardar',
+        description: saveError.message || 'No fue posible actualizar la categoria.',
+        tone: 'error',
+      })
     } finally {
       setSaving(false)
     }
   }
 
   async function handleDeleteCategory(category) {
-    const confirmed = window.confirm(`Eliminar la categoria "${category.name}"?`)
+    const confirmed = window.confirm('¿Seguro que deseas eliminar este elemento?')
     if (!confirmed) {
       return
     }
 
     try {
-      setSaving(true)
+      setDeletingId(category.id)
       setError('')
       await deleteCategory(category.id)
       setCategories((current) => current.filter((item) => item.id !== category.id))
+      showToast({
+        title: 'Elemento eliminado',
+        description: 'La categoria se elimino correctamente.',
+        tone: 'success',
+      })
     } catch (deleteError) {
       setError(deleteError.message || 'No fue posible eliminar la categoria.')
+      showToast({
+        title: 'Error al eliminar',
+        description: deleteError.message || 'No fue posible eliminar la categoria.',
+        tone: 'error',
+      })
     } finally {
-      setSaving(false)
+      setDeletingId('')
     }
   }
 
@@ -123,12 +172,16 @@ export default function AdminCategoriesPage() {
             <label className="field-label">Nombre</label>
             <input
               value={newName}
-              onChange={(event) => setNewName(event.target.value)}
-              className="field-input"
+              onChange={(event) => {
+                setNewName(event.target.value)
+                setFieldErrors((current) => ({ ...current, newName: '' }))
+              }}
+              className={`field-input ${fieldErrors.newName ? 'field-input-error' : ''}`}
               placeholder="Ej. Velas de temporada"
             />
+            {fieldErrors.newName ? <p className="field-error">{fieldErrors.newName}</p> : null}
           </div>
-          <div className="mt-4 rounded-[1.5rem] border border-dashed border-sand bg-petal/80 p-4">
+          <div className="mt-4 rounded-[1.5rem] border border-dashed border-mist/55 bg-white/82 p-4">
             <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
               Slug generado
             </p>
@@ -156,16 +209,22 @@ export default function AdminCategoriesPage() {
                 return (
                   <div
                     key={category.id}
-                    className="rounded-[1.5rem] border border-dashed border-sand bg-white/80 p-4"
+                    className="rounded-[1.5rem] border border-dashed border-mist/55 bg-white/80 p-4"
                   >
                     {isEditing ? (
                       <>
                         <label className="field-label">Nombre</label>
                         <input
                           value={editingName}
-                          onChange={(event) => setEditingName(event.target.value)}
-                          className="field-input"
+                          onChange={(event) => {
+                            setEditingName(event.target.value)
+                            setFieldErrors((current) => ({ ...current, editingName: '' }))
+                          }}
+                          className={`field-input ${fieldErrors.editingName ? 'field-input-error' : ''}`}
                         />
+                        {fieldErrors.editingName ? (
+                          <p className="field-error">{fieldErrors.editingName}</p>
+                        ) : null}
                         <p className="mt-3 text-sm text-slate-500">
                           Slug: {slugify(editingName) || 'pendiente'}
                         </p>
@@ -176,7 +235,7 @@ export default function AdminCategoriesPage() {
                             disabled={saving}
                             className="btn-primary"
                           >
-                            Guardar
+                            {saving ? 'Guardando...' : 'Guardar'}
                           </button>
                           <button
                             type="button"
@@ -210,9 +269,10 @@ export default function AdminCategoriesPage() {
                           <button
                             type="button"
                             onClick={() => handleDeleteCategory(category)}
-                            className="btn-ghost"
+                            disabled={deletingId === category.id}
+                            className="btn-danger disabled:cursor-not-allowed disabled:opacity-70"
                           >
-                            Eliminar
+                            {deletingId === category.id ? 'Eliminando...' : 'Eliminar'}
                           </button>
                         </div>
                       </div>

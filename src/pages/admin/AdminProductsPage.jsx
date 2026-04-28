@@ -4,13 +4,16 @@ import ErrorState from '../../components/common/ErrorState'
 import LoadingState from '../../components/common/LoadingState'
 import PageHeading from '../../components/common/PageHeading'
 import StatusBadge from '../../components/common/StatusBadge'
+import { useToast } from '../../providers/ToastProvider'
 import { deleteProduct, fetchAdminProducts } from '../../services/productService'
 import { deleteProductAssets } from '../../services/imageService'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 
 export default function AdminProductsPage() {
+  const { showToast } = useToast()
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -31,17 +34,30 @@ export default function AdminProductsPage() {
   }
 
   async function handleDelete(product) {
-    const confirmed = window.confirm(`Eliminar ${product.name}?`)
+    const confirmed = window.confirm('¿Seguro que deseas eliminar este elemento?')
     if (!confirmed) {
       return
     }
 
     try {
+      setDeletingId(product.id)
       await deleteProductAssets(product)
       await deleteProduct(product.id)
       await loadProducts()
+      showToast({
+        title: 'Elemento eliminado',
+        description: 'El producto se elimino correctamente.',
+        tone: 'success',
+      })
     } catch (deleteError) {
       setError(deleteError.message || 'No fue posible eliminar el producto.')
+      showToast({
+        title: 'Error al eliminar',
+        description: deleteError.message || 'No fue posible eliminar el producto.',
+        tone: 'error',
+      })
+    } finally {
+      setDeletingId('')
     }
   }
 
@@ -103,9 +119,10 @@ export default function AdminProductsPage() {
                         <button
                           type="button"
                           onClick={() => handleDelete(product)}
-                          className="btn-ghost"
+                          disabled={deletingId === product.id}
+                          className="btn-danger disabled:cursor-not-allowed disabled:opacity-70"
                         >
-                          Eliminar
+                          {deletingId === product.id ? 'Eliminando...' : 'Eliminar'}
                         </button>
                       </div>
                     </td>

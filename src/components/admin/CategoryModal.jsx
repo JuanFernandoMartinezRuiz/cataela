@@ -67,13 +67,14 @@ export default function CategoryModal({
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="field-input"
+              className={`field-input ${error ? 'field-input-error' : ''}`}
               placeholder="Ej. Velas botanicas"
               autoFocus
             />
+            {error ? <p className="field-error">{error}</p> : null}
           </div>
 
-          <div className="rounded-[1.5rem] border border-dashed border-sand bg-petal/80 p-4">
+          <div className="rounded-[1.5rem] border border-dashed border-mist/55 bg-white/82 p-4">
             <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
               Slug generado
             </p>
@@ -82,10 +83,12 @@ export default function CategoryModal({
             </p>
           </div>
 
-          {error ? <p className="text-sm text-rose-700">{error}</p> : null}
-
           <div className="flex flex-wrap gap-3">
-            <button type="submit" disabled={saving} className="btn-primary">
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn-primary disabled:cursor-not-allowed disabled:opacity-70"
+            >
               {saving ? 'Guardando...' : 'Guardar categoria'}
             </button>
             <button type="button" onClick={handleClose} className="btn-secondary">

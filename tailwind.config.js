@@ -6,12 +6,18 @@ export default {
       colors: {
         paper: '#f8f1e8',
         mist: '#a9b8c8',
-        blush: '#f2d6d9',
+        mistDeep: '#8ea2b4',
+        blush: '#ecdadd',
         sand: '#ddc6b2',
         petal: '#fffaf7',
         sage: '#d9e7d5',
+        sageDeep: '#c7dcc1',
         sun: '#f7edb3',
-        rose: '#f3c7d4',
+        sunDeep: '#eadc98',
+        rose: '#ead1d9',
+        roseDeep: '#dfbcc7',
+        danger: '#e8bcc0',
+        dangerDeep: '#d9a2a7',
       },
       fontFamily: {
         brand: ['"Parisienne"', 'cursive'],
@@ -24,7 +30,7 @@ export default {
       },
       backgroundImage: {
         paper:
-          'radial-gradient(circle at top left, rgba(255,255,255,0.85), transparent 35%), radial-gradient(circle at bottom right, rgba(242,214,217,0.38), transparent 28%), linear-gradient(180deg, rgba(248,241,232,0.98), rgba(252,248,243,0.98))',
+          'radial-gradient(circle at top left, rgba(255,255,255,0.85), transparent 35%), radial-gradient(circle at bottom right, rgba(236,218,221,0.22), transparent 28%), linear-gradient(180deg, rgba(248,241,232,0.98), rgba(252,248,243,0.98))',
       },
     },
   },

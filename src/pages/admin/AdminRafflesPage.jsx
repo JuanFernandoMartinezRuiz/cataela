@@ -4,7 +4,9 @@ import ImagePlaceholder from '../../components/common/ImagePlaceholder'
 import LoadingState from '../../components/common/LoadingState'
 import PageHeading from '../../components/common/PageHeading'
 import StatusBadge from '../../components/common/StatusBadge'
+import { useToast } from '../../providers/ToastProvider'
 import {
+  deleteRaffleAssets,
   deleteStoredAsset,
   fetchRaffleImages,
   uploadMainRaffleImage,
@@ -13,6 +15,7 @@ import {
 } from '../../services/imageService'
 import {
   createRaffleWithNumbers,
+  deleteRaffle,
   fetchRaffleById,
   fetchRaffleNumbers,
   fetchRaffles,
@@ -40,6 +43,7 @@ const statusDescriptions = {
 }
 
 export default function AdminRafflesPage() {
+  const { showToast } = useToast()
   const [raffles, setRaffles] = useState([])
   const [selectedRaffleId, setSelectedRaffleId] = useState('')
   const [selectedRaffle, setSelectedRaffle] = useState(null)
@@ -58,9 +62,12 @@ export default function AdminRafflesPage() {
   const [selectedGalleryPreviews, setSelectedGalleryPreviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deletingRaffleId, setDeletingRaffleId] = useState('')
   const [saveLabel, setSaveLabel] = useState('')
   const [warning, setWarning] = useState('')
   const [error, setError] = useState('')
+  const [createFieldErrors, setCreateFieldErrors] = useState({})
+  const [editFieldErrors, setEditFieldErrors] = useState({})
 
   useEffect(() => {
     loadRaffles()
@@ -117,13 +124,38 @@ export default function AdminRafflesPage() {
 
   async function handleCreateRaffle(event) {
     event.preventDefault()
+    const nextFieldErrors = validateRaffleForm(raffleForm)
+
+    if (Object.keys(nextFieldErrors).length) {
+      setCreateFieldErrors(nextFieldErrors)
+      setError('Revisa los campos.')
+      showToast({
+        title: 'Revisa los campos',
+        description: 'Completa la informacion obligatoria de la rifa.',
+        tone: 'error',
+      })
+      return
+    }
+
+    if (raffleForm.status === 'active') {
+      const confirmed = window.confirm(
+        'Esta rifa se creara como activa y cualquier otra rifa activa se cerrara automaticamente. ¿Deseas continuar?',
+      )
+
+      if (!confirmed) {
+        return
+      }
+    }
+
     setSaving(true)
     setSaveLabel('')
     setWarning('')
     setError('')
+    setCreateFieldErrors({})
 
     try {
       let uploadedMainImage = null
+      let galleryUploadFailed = false
 
       if (createMainImageFile) {
         try {
@@ -168,9 +200,16 @@ export default function AdminRafflesPage() {
           setSaveLabel('Subiendo galeria...')
           await uploadRaffleGalleryImages(createdRaffle.id, createGalleryFiles, 0)
         } catch {
+          galleryUploadFailed = true
           setWarning(
             'La rifa se creo correctamente, pero una o mas imagenes adicionales no se pudieron subir.',
           )
+          showToast({
+            title: 'Guardado con advertencias',
+            description:
+              'La rifa se creo correctamente, pero una o mas imagenes adicionales no se pudieron subir.',
+            tone: 'warning',
+          })
         }
       }
 
@@ -180,30 +219,25 @@ export default function AdminRafflesPage() {
       setCreateGalleryFiles([])
       resetPreviewUrls(createGalleryPreviews)
       setCreateGalleryPreviews([])
+      if (!galleryUploadFailed) {
+        showToast({
+          title: 'Elemento guardado',
+          description: 'La rifa se creo correctamente.',
+          tone: 'success',
+        })
+      }
       await loadRaffles()
       setSelectedRaffleId(createdRaffle.id)
     } catch (saveError) {
       setError(saveError.message || 'No fue posible crear la rifa.')
+      showToast({
+        title: 'Error al guardar',
+        description: saveError.message || 'No fue posible crear la rifa.',
+        tone: 'error',
+      })
     } finally {
       setSaving(false)
       setSaveLabel('')
-    }
-  }
-
-  async function handleUpdateRaffleMeta(field, value) {
-    if (!selectedRaffle) {
-      return
-    }
-
-    const nextRaffle = { ...selectedRaffle, [field]: value }
-    setSelectedRaffle(nextRaffle)
-
-    try {
-      await updateRaffle(selectedRaffle.id, { [field]: value })
-      await loadRaffles()
-      setSelectedRaffleId(selectedRaffle.id)
-    } catch (updateError) {
-      setError(updateError.message || 'No fue posible actualizar la rifa.')
     }
   }
 
@@ -213,11 +247,51 @@ export default function AdminRafflesPage() {
       return
     }
 
+    const nextFieldErrors = validateRaffleForm(selectedRaffle)
+
+    if (Object.keys(nextFieldErrors).length) {
+      setEditFieldErrors(nextFieldErrors)
+      setError('Revisa los campos.')
+      showToast({
+        title: 'Revisa los campos',
+        description: 'Completa la informacion obligatoria de la rifa.',
+        tone: 'error',
+      })
+      return
+    }
+
+    const originalRaffle = raffles.find((raffle) => raffle.id === selectedRaffle.id)
+    const isChangingToActive =
+      selectedRaffle.status === 'active' && originalRaffle?.status !== 'active'
+    const isChangingToClosed =
+      selectedRaffle.status === 'closed' && originalRaffle?.status !== 'closed'
+
+    if (isChangingToActive) {
+      const confirmed = window.confirm(
+        'Esta rifa pasara a ser la activa y cualquier otra rifa activa se cerrara automaticamente. ¿Deseas continuar?',
+      )
+
+      if (!confirmed) {
+        return
+      }
+    }
+
+    if (isChangingToClosed) {
+      const confirmed = window.confirm(
+        'Esta rifa dejara de mostrarse al publico al cambiarse a cerrada. ¿Deseas continuar?',
+      )
+
+      if (!confirmed) {
+        return
+      }
+    }
+
     try {
       setSaving(true)
       setSaveLabel('Guardando rifa...')
       setError('')
       setWarning('')
+      setEditFieldErrors({})
 
       await updateRaffle(selectedRaffle.id, {
         title: selectedRaffle.title,
@@ -231,8 +305,18 @@ export default function AdminRafflesPage() {
 
       await loadRaffles()
       await loadNumbers(selectedRaffle.id)
+      showToast({
+        title: 'Elemento guardado',
+        description: 'La rifa se actualizo correctamente.',
+        tone: 'success',
+      })
     } catch (saveError) {
       setError(saveError.message || 'No fue posible guardar los cambios de la rifa.')
+      showToast({
+        title: 'Error al guardar',
+        description: saveError.message || 'No fue posible guardar la rifa.',
+        tone: 'error',
+      })
     } finally {
       setSaving(false)
       setSaveLabel('')
@@ -245,9 +329,36 @@ export default function AdminRafflesPage() {
       return
     }
 
+    const originalNumber = numbers.find((number) => number.id === numberForm.id)
+
+    if (numberForm.status === 'winner' && originalNumber?.status !== 'winner') {
+      const winnerOnUnpaid =
+        originalNumber?.status !== 'paid' && originalNumber?.status !== 'winner'
+
+      if (winnerOnUnpaid) {
+        const confirmed = window.confirm(
+          'Este numero no esta marcado como pagado. ¿Deseas marcarlo como ganador de todas formas?',
+        )
+
+        if (!confirmed) {
+          return
+        }
+      } else {
+        const confirmed = window.confirm(
+          `Se marcara el numero ${numberForm.number} como ganador. Si ya existe otro ganador, se reemplazara. ¿Deseas continuar?`,
+        )
+
+        if (!confirmed) {
+          return
+        }
+      }
+    }
+
     try {
       setSaving(true)
       setSaveLabel('Guardando numero...')
+      setWarning('')
+      setError('')
       await updateRaffleNumber(numberForm.id, {
         raffle_id: selectedRaffle.id,
         status: numberForm.status,
@@ -255,8 +366,18 @@ export default function AdminRafflesPage() {
         buyer_phone: numberForm.buyer_phone || null,
       })
       await loadNumbers(selectedRaffle.id)
+      showToast({
+        title: 'Elemento guardado',
+        description: 'El numero de la rifa se actualizo correctamente.',
+        tone: 'success',
+      })
     } catch (saveError) {
       setError(saveError.message || 'No fue posible guardar el numero.')
+      showToast({
+        title: 'Error al guardar',
+        description: saveError.message || 'No fue posible guardar el numero.',
+        tone: 'error',
+      })
     } finally {
       setSaving(false)
       setSaveLabel('')
@@ -278,6 +399,7 @@ export default function AdminRafflesPage() {
     setError('')
 
     try {
+      let galleryUploadFailed = false
       if (selectedMainImageFile) {
         let newMainImageUrl = null
 
@@ -313,18 +435,78 @@ export default function AdminRafflesPage() {
             raffleImages.length,
           )
         } catch {
+          galleryUploadFailed = true
           setWarning(
             'La imagen principal se guardo, pero una o mas imagenes adicionales no se pudieron subir.',
           )
+          showToast({
+            title: 'Guardado con advertencias',
+            description:
+              'La imagen principal se guardo, pero una o mas imagenes adicionales no se pudieron subir.',
+            tone: 'warning',
+          })
         }
       }
 
       await loadNumbers(selectedRaffle.id)
+      if (!galleryUploadFailed) {
+        showToast({
+          title: 'Elemento guardado',
+          description: 'Las imagenes de la rifa se actualizaron correctamente.',
+          tone: 'success',
+        })
+      }
     } catch (saveError) {
       setError(saveError.message || 'No fue posible actualizar las imagenes de la rifa.')
+      showToast({
+        title: 'Error al guardar',
+        description: saveError.message || 'No fue posible actualizar las imagenes.',
+        tone: 'error',
+      })
     } finally {
       setSaving(false)
       setSaveLabel('')
+    }
+  }
+
+  async function handleDeleteSelectedRaffle() {
+    if (!selectedRaffle) {
+      return
+    }
+
+    const confirmed = window.confirm('¿Seguro que deseas eliminar este elemento?')
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setDeletingRaffleId(selectedRaffle.id)
+      setError('')
+      await deleteRaffleAssets({
+        main_image_url: selectedRaffle.main_image_url,
+        gallery: raffleImages,
+      })
+      await deleteRaffle(selectedRaffle.id)
+      setSelectedRaffleId('')
+      setSelectedRaffle(null)
+      setNumbers([])
+      setRaffleImages([])
+      setNumberForm(null)
+      await loadRaffles()
+      showToast({
+        title: 'Elemento eliminado',
+        description: 'La rifa se elimino correctamente.',
+        tone: 'success',
+      })
+    } catch (deleteError) {
+      setError(deleteError.message || 'No fue posible eliminar la rifa.')
+      showToast({
+        title: 'Error al eliminar',
+        description: deleteError.message || 'No fue posible eliminar la rifa.',
+        tone: 'error',
+      })
+    } finally {
+      setDeletingRaffleId('')
     }
   }
 
@@ -354,9 +536,20 @@ export default function AdminRafflesPage() {
     setSelectedGalleryPreviews(nextFiles.map((file) => URL.createObjectURL(file)))
   }
 
+  function updateCreateForm(field, value) {
+    setRaffleForm((current) => ({ ...current, [field]: value }))
+    setCreateFieldErrors((current) => clearFieldError(current, field))
+  }
+
+  function updateSelectedRaffle(field, value) {
+    setSelectedRaffle((current) => ({ ...current, [field]: value }))
+    setEditFieldErrors((current) => clearFieldError(current, field))
+  }
+
   const visibleNumbers =
     filter === 'all' ? numbers : numbers.filter((number) => number.status === filter)
   const summary = getRaffleSummary(selectedRaffle, numbers)
+  const winnerNumber = numbers.find((number) => number.status === 'winner') || null
 
   return (
     <>
@@ -382,53 +575,48 @@ export default function AdminRafflesPage() {
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <Field label="Titulo">
                   <input
-                    className="field-input"
                     value={raffleForm.title}
-                    onChange={(event) =>
-                      setRaffleForm((current) => ({ ...current, title: event.target.value }))
-                    }
+                    onChange={(event) => updateCreateForm('title', event.target.value)}
+                    className={getFieldInputClassName(createFieldErrors.title)}
                   />
+                  {createFieldErrors.title ? <p className="field-error">{createFieldErrors.title}</p> : null}
                 </Field>
                 <Field label="Premio">
                   <input
-                    className="field-input"
+                    className={getFieldInputClassName(createFieldErrors.prize)}
                     value={raffleForm.prize}
-                    onChange={(event) =>
-                      setRaffleForm((current) => ({ ...current, prize: event.target.value }))
-                    }
+                    onChange={(event) => updateCreateForm('prize', event.target.value)}
                   />
+                  {createFieldErrors.prize ? <p className="field-error">{createFieldErrors.prize}</p> : null}
                 </Field>
                 <Field label="Precio por numero">
                   <input
                     type="number"
                     min="0"
-                    className="field-input"
+                    className={getFieldInputClassName(createFieldErrors.price_per_number)}
                     value={raffleForm.price_per_number}
-                    onChange={(event) =>
-                      setRaffleForm((current) => ({
-                        ...current,
-                        price_per_number: event.target.value,
-                      }))
-                    }
+                    onChange={(event) => updateCreateForm('price_per_number', event.target.value)}
                   />
+                  {createFieldErrors.price_per_number ? (
+                    <p className="field-error">{createFieldErrors.price_per_number}</p>
+                  ) : null}
                 </Field>
                 <Field label="Fecha sorteo">
                   <input
                     type="date"
-                    className="field-input"
+                    className={getFieldInputClassName(createFieldErrors.draw_date)}
                     value={raffleForm.draw_date}
-                    onChange={(event) =>
-                      setRaffleForm((current) => ({ ...current, draw_date: event.target.value }))
-                    }
+                    onChange={(event) => updateCreateForm('draw_date', event.target.value)}
                   />
+                  {createFieldErrors.draw_date ? (
+                    <p className="field-error">{createFieldErrors.draw_date}</p>
+                  ) : null}
                 </Field>
                 <Field label="Estado">
                   <select
                     className="field-input"
                     value={raffleForm.status}
-                    onChange={(event) =>
-                      setRaffleForm((current) => ({ ...current, status: event.target.value }))
-                    }
+                    onChange={(event) => updateCreateForm('status', event.target.value)}
                   >
                     {raffleStatuses.map((status) => (
                       <option key={status} value={status}>
@@ -440,15 +628,13 @@ export default function AdminRafflesPage() {
                 <Field label="Descripcion" className="md:col-span-2">
                   <textarea
                     rows="4"
-                    className="field-input"
+                    className={getFieldInputClassName(createFieldErrors.description)}
                     value={raffleForm.description}
-                    onChange={(event) =>
-                      setRaffleForm((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
+                    onChange={(event) => updateCreateForm('description', event.target.value)}
                   />
+                  {createFieldErrors.description ? (
+                    <p className="field-error">{createFieldErrors.description}</p>
+                  ) : null}
                 </Field>
                 <Field label="Foto principal del premio" className="md:col-span-2">
                   <input
@@ -489,7 +675,11 @@ export default function AdminRafflesPage() {
                   ))}
                 </div>
               </div>
-              <button type="submit" disabled={saving} className="btn-primary mt-6">
+              <button
+                type="submit"
+                disabled={saving}
+                className="btn-primary mt-6 disabled:cursor-not-allowed disabled:opacity-70"
+              >
                 {saving ? saveLabel || 'Creando...' : 'Crear rifa y generar numeros'}
               </button>
               <p className="mt-3 text-sm text-slate-500">
@@ -538,73 +728,65 @@ export default function AdminRafflesPage() {
                         Editar datos de la rifa
                       </h2>
                     </div>
-                    <StatusBadge tone={selectedRaffle.status}>
-                      {selectedRaffle.status}
-                    </StatusBadge>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <StatusBadge tone={selectedRaffle.status}>
+                        {selectedRaffle.status}
+                      </StatusBadge>
+                      {summary.isComplete ? (
+                        <span className="inline-flex rounded-full border border-dashed border-sageDeep/80 bg-sage/45 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
+                          Rifa completa
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="mt-6 grid gap-4 md:grid-cols-2">
                     <Field label="Titulo">
                       <input
-                        className="field-input"
+                        className={getFieldInputClassName(editFieldErrors.title)}
                         value={selectedRaffle.title || ''}
-                        onChange={(event) =>
-                          setSelectedRaffle((current) => ({
-                            ...current,
-                            title: event.target.value,
-                          }))
-                        }
+                        onChange={(event) => updateSelectedRaffle('title', event.target.value)}
                       />
+                      {editFieldErrors.title ? <p className="field-error">{editFieldErrors.title}</p> : null}
                     </Field>
                     <Field label="Premio">
                       <input
-                        className="field-input"
+                        className={getFieldInputClassName(editFieldErrors.prize)}
                         value={selectedRaffle.prize || ''}
-                        onChange={(event) =>
-                          setSelectedRaffle((current) => ({
-                            ...current,
-                            prize: event.target.value,
-                          }))
-                        }
+                        onChange={(event) => updateSelectedRaffle('prize', event.target.value)}
                       />
+                      {editFieldErrors.prize ? <p className="field-error">{editFieldErrors.prize}</p> : null}
                     </Field>
                     <Field label="Precio por numero">
                       <input
                         type="number"
                         min="0"
-                        className="field-input"
+                        className={getFieldInputClassName(editFieldErrors.price_per_number)}
                         value={selectedRaffle.price_per_number || ''}
                         onChange={(event) =>
-                          setSelectedRaffle((current) => ({
-                            ...current,
-                            price_per_number: event.target.value,
-                          }))
+                          updateSelectedRaffle('price_per_number', event.target.value)
                         }
                       />
+                      {editFieldErrors.price_per_number ? (
+                        <p className="field-error">{editFieldErrors.price_per_number}</p>
+                      ) : null}
                     </Field>
                     <Field label="Fecha sorteo">
                       <input
                         type="date"
-                        className="field-input"
+                        className={getFieldInputClassName(editFieldErrors.draw_date)}
                         value={selectedRaffle.draw_date || ''}
-                        onChange={(event) =>
-                          setSelectedRaffle((current) => ({
-                            ...current,
-                            draw_date: event.target.value,
-                          }))
-                        }
+                        onChange={(event) => updateSelectedRaffle('draw_date', event.target.value)}
                       />
+                      {editFieldErrors.draw_date ? (
+                        <p className="field-error">{editFieldErrors.draw_date}</p>
+                      ) : null}
                     </Field>
                     <Field label="Estado">
                       <select
                         className="field-input"
                         value={selectedRaffle.status}
-                        onChange={(event) =>
-                          setSelectedRaffle((current) => ({
-                            ...current,
-                            status: event.target.value,
-                          }))
-                        }
+                        onChange={(event) => updateSelectedRaffle('status', event.target.value)}
                       >
                         {raffleStatuses.map((status) => (
                           <option key={status} value={status}>
@@ -632,31 +814,58 @@ export default function AdminRafflesPage() {
                     <Field label="Descripcion" className="md:col-span-2">
                       <textarea
                         rows="4"
-                        className="field-input"
+                        className={getFieldInputClassName(editFieldErrors.description)}
                         value={selectedRaffle.description || ''}
                         onChange={(event) =>
-                          setSelectedRaffle((current) => ({
-                            ...current,
-                            description: event.target.value,
-                          }))
+                          updateSelectedRaffle('description', event.target.value)
                         }
                       />
+                      {editFieldErrors.description ? (
+                        <p className="field-error">{editFieldErrors.description}</p>
+                      ) : null}
                     </Field>
                   </div>
 
                   <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <SummaryCard label="Total" value={summary.total} />
-                    <SummaryCard label="Pagados" value={summary.paidCount} />
                     <SummaryCard label="Disponibles" value={summary.availableCount} />
+                    <SummaryCard label="Apartados" value={summary.reservedCount} />
+                    <SummaryCard label="Pagados" value={summary.paidCount} />
+                    <SummaryCard
+                      label="Ganador"
+                      value={winnerNumber?.number || summary.winnerCount || 'Sin ganador'}
+                    />
                     <SummaryCard
                       label="Ingreso pagado"
                       value={formatCurrency(summary.paidRevenue)}
                     />
+                    <SummaryCard
+                      label="Ingreso pendiente"
+                      value={formatCurrency(summary.pendingRevenue)}
+                    />
+                    <SummaryCard
+                      label="Ingreso total esperado"
+                      value={formatCurrency(summary.potentialRevenue)}
+                    />
                   </div>
 
-                  <button type="submit" disabled={saving} className="btn-primary mt-6">
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="btn-primary disabled:cursor-not-allowed disabled:opacity-70"
+                    >
                     {saving ? saveLabel || 'Guardando...' : 'Guardar cambios de la rifa'}
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteSelectedRaffle}
+                      disabled={deletingRaffleId === selectedRaffle.id}
+                      className="btn-danger disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {deletingRaffleId === selectedRaffle.id ? 'Eliminando...' : 'Eliminar rifa'}
+                    </button>
+                  </div>
                 </form>
 
                 <div className="admin-panel p-6">
@@ -716,23 +925,37 @@ export default function AdminRafflesPage() {
                     type="button"
                     onClick={handleSaveRaffleImages}
                     disabled={saving}
-                    className="btn-primary mt-6"
+                    className="btn-primary mt-6 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {saving ? saveLabel || 'Guardando...' : 'Guardar imagenes'}
                   </button>
                 </div>
 
                 <div className="admin-panel p-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-display text-3xl text-slate-700">Numeros de la rifa</h3>
+                      <p className="mt-2 text-sm text-slate-500">
+                        Puedes seguir editando cualquier numero manualmente en todo momento.
+                      </p>
+                    </div>
+                    {summary.isComplete ? (
+                      <span className="inline-flex rounded-full border border-dashed border-sageDeep/80 bg-sage/45 px-4 py-2 text-sm font-semibold text-slate-700">
+                        Rifa completa
+                      </span>
+                    ) : null}
+                  </div>
+
                   <div className="flex flex-wrap gap-2">
                     {['all', ...raffleNumberStatuses].map((status) => (
                       <button
                         key={status}
                         type="button"
                         onClick={() => setFilter(status)}
-                        className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                        className={`filter-pill ${
                           filter === status
-                            ? 'bg-slate-700 text-white'
-                            : 'border border-dashed border-sand bg-white/80 text-slate-600'
+                            ? 'filter-pill-active'
+                            : 'filter-pill-idle'
                         }`}
                       >
                         {status}
@@ -780,6 +1003,14 @@ export default function AdminRafflesPage() {
                             </option>
                           ))}
                         </select>
+                        {numberForm.status === 'winner' &&
+                        numberForm.id &&
+                        numbers.find((number) => number.id === numberForm.id)?.status !== 'paid' &&
+                        numbers.find((number) => number.id === numberForm.id)?.status !== 'winner' ? (
+                          <p className="mt-2 text-xs text-amber-700">
+                            Se mostrara una advertencia si marcas este numero como ganador sin estar pagado.
+                          </p>
+                        ) : null}
                       </Field>
                       <Field label="Comprador">
                         <input
@@ -805,7 +1036,11 @@ export default function AdminRafflesPage() {
                           className="field-input"
                         />
                       </Field>
-                      <button type="submit" className="btn-primary md:col-span-2">
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="btn-primary md:col-span-2 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
                         {saving ? saveLabel || 'Guardando...' : 'Guardar numero'}
                       </button>
                     </form>
@@ -842,11 +1077,51 @@ function SummaryCard({ label, value }) {
   )
 }
 
+function validateRaffleForm(values) {
+  const errors = {}
+
+  if (!values?.title?.trim()) {
+    errors.title = 'Este campo es obligatorio.'
+  }
+
+  if (!values?.prize?.trim()) {
+    errors.prize = 'Este campo es obligatorio.'
+  }
+
+  if (!values?.price_per_number) {
+    errors.price_per_number = 'Este campo es obligatorio.'
+  }
+
+  if (!values?.draw_date) {
+    errors.draw_date = 'Este campo es obligatorio.'
+  }
+
+  if (!values?.description?.trim()) {
+    errors.description = 'Este campo es obligatorio.'
+  }
+
+  return errors
+}
+
+function clearFieldError(errors, field) {
+  if (!errors[field]) {
+    return errors
+  }
+
+  const nextErrors = { ...errors }
+  delete nextErrors[field]
+  return nextErrors
+}
+
+function getFieldInputClassName(hasError) {
+  return `field-input ${hasError ? 'field-input-error' : ''}`.trim()
+}
+
 const stateStyles = {
-  available: 'bg-white text-slate-700 border-sand/60',
-  reserved: 'bg-sun text-slate-700 border-yellow-200',
-  paid: 'bg-sage text-slate-700 border-emerald-200',
-  winner: 'bg-rose text-slate-700 border-rose-200 ring-2 ring-white/80',
+  available: 'bg-mist/16 text-slate-700 border-mist/55',
+  reserved: 'bg-sun/78 text-slate-700 border-sunDeep/80',
+  paid: 'bg-sage text-slate-700 border-sageDeep/80',
+  winner: 'bg-rose/62 text-slate-700 border-roseDeep/80 ring-2 ring-white/80',
 }
 
 function resetPreviewUrls(previews) {

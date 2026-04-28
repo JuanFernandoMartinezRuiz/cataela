@@ -4,6 +4,7 @@ import ErrorState from '../../components/common/ErrorState'
 import LoadingState from '../../components/common/LoadingState'
 import PageHeading from '../../components/common/PageHeading'
 import ProductForm from '../../components/admin/ProductForm'
+import { useToast } from '../../providers/ToastProvider'
 import { createCategory, fetchCategories } from '../../services/categoryService'
 import {
   deleteProductImage,
@@ -21,6 +22,7 @@ import {
 import { slugify } from '../../utils/slugify'
 
 export default function AdminProductFormPage() {
+  const { showToast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
   const { id } = useParams()
@@ -70,9 +72,14 @@ export default function AdminProductFormPage() {
   useEffect(() => {
     if (location.state?.warning) {
       setWarning(location.state.warning)
+      showToast({
+        title: 'Producto guardado',
+        description: location.state.warning,
+        tone: 'warning',
+      })
       navigate(location.pathname, { replace: true, state: null })
     }
-  }, [location.pathname, location.state, navigate])
+  }, [location.pathname, location.state, navigate, showToast])
 
   async function handleSubmit({ values, mainImageFile, galleryFiles }) {
     setSaving(true)
@@ -129,12 +136,23 @@ export default function AdminProductFormPage() {
             setWarning(
               'El producto se guardo, pero una o mas imagenes adicionales no se pudieron subir.',
             )
+            showToast({
+              title: 'Producto actualizado',
+              description:
+                'El producto se guardo, pero una o mas imagenes adicionales no se pudieron subir.',
+              tone: 'warning',
+            })
             const refreshedProduct = await fetchProductById(id)
             setProduct(refreshedProduct)
             return
           }
         }
 
+        showToast({
+          title: 'Producto actualizado',
+          description: 'Los cambios se guardaron correctamente.',
+          tone: 'success',
+        })
         navigate('/admin/productos')
         return
       }
@@ -191,9 +209,19 @@ export default function AdminProductFormPage() {
         }
       }
 
+      showToast({
+        title: 'Producto creado correctamente',
+        description: 'Ya puedes verlo y seguir editandolo desde el panel.',
+        tone: 'success',
+      })
       navigate('/admin/productos')
     } catch (submitError) {
       setError(submitError.message || 'No fue posible guardar el producto.')
+      showToast({
+        title: 'Error al guardar',
+        description: submitError.message || 'Revisa los campos e intenta nuevamente.',
+        tone: 'error',
+      })
       throw submitError
     } finally {
       setSaving(false)
@@ -206,19 +234,43 @@ export default function AdminProductFormPage() {
       await deleteProductImage(image)
       const refreshedProduct = await fetchProductById(id)
       setProduct(refreshedProduct)
+      showToast({
+        title: 'Elemento eliminado',
+        description: 'La imagen se elimino correctamente.',
+        tone: 'success',
+      })
     } catch (deleteError) {
       setError(deleteError.message || 'No fue posible eliminar la imagen.')
+      showToast({
+        title: 'Error al eliminar',
+        description: deleteError.message || 'Intenta nuevamente.',
+        tone: 'error',
+      })
     }
   }
 
   async function handleCreateCategory(name) {
-    const category = await createCategory({ name })
-    setCategories((current) =>
-      [...current, category].sort((left, right) =>
-        left.name.localeCompare(right.name, 'es', { sensitivity: 'base' }),
-      ),
-    )
-    return category
+    try {
+      const category = await createCategory({ name })
+      setCategories((current) =>
+        [...current, category].sort((left, right) =>
+          left.name.localeCompare(right.name, 'es', { sensitivity: 'base' }),
+        ),
+      )
+      showToast({
+        title: 'Categoria creada',
+        description: 'Ya puedes usarla en este producto.',
+        tone: 'success',
+      })
+      return category
+    } catch (createError) {
+      showToast({
+        title: 'Error al guardar',
+        description: createError.message || 'No fue posible crear la categoria.',
+        tone: 'error',
+      })
+      throw createError
+    }
   }
 
   return (

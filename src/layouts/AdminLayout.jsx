@@ -34,7 +34,7 @@ export default function AdminLayout() {
                 className={({ isActive }) =>
                   `block rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                     isActive
-                      ? 'bg-mist text-white'
+                      ? 'bg-mist text-white shadow-soft'
                       : 'bg-white/75 text-slate-600 hover:bg-white'
                   }`
                 }
@@ -44,7 +44,7 @@ export default function AdminLayout() {
             ))}
           </nav>
 
-          <div className="mt-8 rounded-[1.5rem] border border-dashed border-sand bg-petal/80 p-4">
+          <div className="mt-8 rounded-[1.5rem] border border-dashed border-sageDeep/80 bg-white/82 p-4">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
               Sesion activa
             </p>

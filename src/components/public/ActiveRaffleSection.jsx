@@ -32,38 +32,60 @@ export default function ActiveRaffleSection({ raffle }) {
             }
           />
 
+          {raffle.summary?.isComplete ? (
+            <div className="inline-flex rounded-full border border-dashed border-sageDeep/80 bg-sage/45 px-4 py-2 text-sm font-semibold text-slate-700">
+              Rifa completa
+            </div>
+          ) : null}
+
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="card-dashed p-5">
+            <div className="card-dashed-rose p-5">
               <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Premio</p>
               <p className="mt-2 font-display text-3xl text-slate-700">{raffle.prize}</p>
             </div>
-            <div className="card-dashed p-5">
+            <div className="card-dashed-green p-5">
               <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Valor por numero</p>
               <p className="mt-2 font-display text-3xl text-slate-700">
                 {formatCurrency(raffle.price_per_number)}
               </p>
             </div>
-            <div className="card-dashed p-5">
+            <div className="card-dashed-blue p-5">
               <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Sorteo</p>
               <p className="mt-2 font-display text-3xl text-slate-700">
                 {formatDate(raffle.draw_date)}
               </p>
             </div>
-            <div className="card-dashed p-5">
+            <div className="card-dashed-green p-5">
               <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Estado</p>
               <div className="mt-3">
                 <StatusBadge tone={raffle.status}>{raffle.status}</StatusBadge>
               </div>
             </div>
-            <div className="card-dashed p-5 md:col-span-2">
-              <div className="grid gap-4 sm:grid-cols-4">
+            <div className="card-dashed-blue p-5 md:col-span-2">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <SummaryItem label="Total" value={raffle.summary.total} />
                 <SummaryItem label="Disponibles" value={raffle.summary.availableCount} />
                 <SummaryItem label="Apartados" value={raffle.summary.reservedCount} />
                 <SummaryItem label="Pagados" value={raffle.summary.paidCount} />
+                <SummaryItem
+                  label="Ganador"
+                  value={winner?.number || raffle.summary.winnerCount || 'Sin ganador'}
+                />
+                <SummaryItem
+                  label="Ingreso pagado"
+                  value={formatCurrency(raffle.summary.paidRevenue)}
+                />
+                <SummaryItem
+                  label="Ingreso pendiente"
+                  value={formatCurrency(raffle.summary.pendingRevenue)}
+                />
+                <SummaryItem
+                  label="Ingreso total esperado"
+                  value={formatCurrency(raffle.summary.potentialRevenue)}
+                />
               </div>
             </div>
-            <div className="card-dashed p-5 md:col-span-2">
+            <div className="card-dashed-rose p-5 md:col-span-2">
               <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Estados</p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <LegendItem label="Disponible" tone="available" />
@@ -73,7 +95,7 @@ export default function ActiveRaffleSection({ raffle }) {
               </div>
             </div>
             {winner ? (
-              <div className="rounded-[1.75rem] border border-dashed border-sand bg-gradient-to-br from-rose/40 via-white to-sun/45 p-5 shadow-soft md:col-span-2">
+              <div className="rounded-[1.75rem] border border-dashed border-roseDeep/80 bg-gradient-to-br from-rose/28 via-white to-sun/26 p-5 shadow-soft md:col-span-2">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
                   Resultado del sorteo
                 </p>
@@ -94,7 +116,7 @@ export default function ActiveRaffleSection({ raffle }) {
 
         <div className="space-y-4 lg:pt-1">
           {hasImages ? (
-            <div className="rounded-[1.75rem] border border-dashed border-sand bg-white/70 p-5 shadow-soft">
+            <div className="card-dashed-blue p-5">
               {raffle.main_image_url ? (
                 <img
                   src={raffle.main_image_url}
@@ -121,7 +143,7 @@ export default function ActiveRaffleSection({ raffle }) {
           ) : null}
         </div>
 
-        <div className="rounded-[1.75rem] border border-dashed border-sand bg-gradient-to-br from-white/75 to-mist/10 p-5 lg:col-span-2">
+        <div className="card-dashed-green bg-gradient-to-br from-white/80 to-sage/18 p-5 lg:col-span-2">
           <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
             Numeros disponibles de la rifa
           </p>
@@ -159,8 +181,8 @@ function LegendItem({ label, tone }) {
 }
 
 const stateStyles = {
-  available: 'bg-white text-slate-700 border-sand/60',
-  reserved: 'bg-sun text-slate-700 border-yellow-200',
-  paid: 'bg-sage text-slate-700 border-emerald-200',
-  winner: 'bg-rose text-slate-700 border-rose-200 ring-2 ring-white/80',
+  available: 'bg-mist/16 text-slate-700 border-mist/55',
+  reserved: 'bg-sun/78 text-slate-700 border-sunDeep/80',
+  paid: 'bg-sage text-slate-700 border-sageDeep/80',
+  winner: 'bg-rose/62 text-slate-700 border-roseDeep/80 ring-2 ring-white/80',
 }

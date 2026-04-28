@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import ErrorState from '../../components/common/ErrorState'
-import ImagePlaceholder from '../../components/common/ImagePlaceholder'
 import LoadingState from '../../components/common/LoadingState'
-import StatusBadge from '../../components/common/StatusBadge'
+import PageHeading from '../../components/common/PageHeading'
+import ProductGallery from '../../components/public/ProductGallery'
 import { fetchProductBySlug } from '../../services/productService'
 import { buildWhatsAppProductLink, formatCurrency } from '../../utils/formatters'
 
@@ -62,71 +62,82 @@ export default function ProductDetailPage() {
     )
   }
 
-  const gallery = [
-    ...(product.main_image_url ? [{ id: 'main', image_url: product.main_image_url }] : []),
-    ...(product.gallery ?? []),
-  ]
-
   return (
     <section className="page-section pt-16">
       <Link to="/catalogo" className="btn-secondary mb-6">
         Volver al catalogo
       </Link>
 
-      <div className="card-soft grid gap-8 p-6 md:p-8 lg:grid-cols-[1fr_0.95fr]">
-        <div>
-          {selectedImage ? (
-            <img
-              src={selectedImage}
-              alt={product.name}
-              className="h-[420px] w-full rounded-[2rem] object-cover"
+      <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+        <ProductGallery
+          product={product}
+          selectedImage={selectedImage}
+          onSelectImage={setSelectedImage}
+        />
+
+        <div className="space-y-5">
+          <div className="card-soft p-6 md:p-8">
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-500">
+              {product.category?.name || 'Coleccion Cataela'}
+            </p>
+            <PageHeading
+              title={product.name}
+              description="Una pieza artesanal creada con detalle, aroma y calidez para acompanar momentos especiales."
             />
-          ) : (
-            <ImagePlaceholder label={product.name} className="h-[420px] w-full" />
-          )}
 
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            {gallery.map((image) => (
-              <button
-                key={image.id}
-                type="button"
-                onClick={() => setSelectedImage(image.image_url)}
-                className="overflow-hidden rounded-[1.25rem] border border-white/70"
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <span className="rounded-full border border-dashed border-sageDeep/70 bg-white px-5 py-2 text-sm font-semibold text-slate-700">
+                {formatCurrency(product.price)}
+              </span>
+              <span className="rounded-full border border-dashed border-mist/55 bg-mist/10 px-5 py-2 text-sm font-semibold text-slate-600">
+                Hecho a mano en Popayan
+              </span>
+            </div>
+
+            <div className="mt-6 rounded-[1.75rem] border border-dashed border-roseDeep/70 bg-white/80 p-5">
+              <p className="text-sm leading-8 text-slate-600">{product.description}</p>
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <a
+                href={buildWhatsAppProductLink(product)}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-primary"
               >
-                <img src={image.image_url} alt={product.name} className="h-24 w-full object-cover" />
-              </button>
-            ))}
+                Pedir por WhatsApp
+              </a>
+              <Link to="/catalogo" className="btn-secondary">
+                Seguir viendo catalogo
+              </Link>
+            </div>
           </div>
-        </div>
 
-        <div>
-          <StatusBadge tone={product.is_active ? 'active' : 'inactive'}>
-            {product.is_active ? 'Activo' : 'Inactivo'}
-          </StatusBadge>
-          <p className="mt-5 text-xs uppercase tracking-[0.35em] text-slate-500">
-            {product.category?.name || 'Coleccion Cataela'}
-          </p>
-          <h1 className="mt-3 font-display text-5xl text-slate-700">{product.name}</h1>
-          <p className="mt-4 font-display text-3xl text-slate-700">
-            {formatCurrency(product.price)}
-          </p>
-          <p className="mt-5 text-base leading-8 text-slate-600">{product.description}</p>
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a
-              href={buildWhatsAppProductLink(product)}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-primary"
-            >
-              Pedir por WhatsApp
-            </a>
-            <Link to="/catalogo" className="btn-secondary">
-              Seguir viendo catalogo
-            </Link>
+          <div className="card-dashed-green p-5">
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
+              Detalles del producto
+            </p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <DetailItem label="Categoria" value={product.category?.name || 'Cataela'} />
+              <DetailItem label="Precio" value={formatCurrency(product.price)} />
+              <DetailItem
+                label="Galeria"
+                value={product.gallery?.length ? `${product.gallery.length + 1} imagenes` : 'Imagen principal'}
+              />
+              <DetailItem label="Compra" value="Atencion directa por WhatsApp" />
+            </div>
           </div>
         </div>
       </div>
     </section>
+  )
+}
+
+function DetailItem({ label, value }) {
+  return (
+    <div className="rounded-[1.25rem] border border-dashed border-mist/45 bg-white/75 p-4">
+      <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-slate-700">{value}</p>
+    </div>
   )
 }

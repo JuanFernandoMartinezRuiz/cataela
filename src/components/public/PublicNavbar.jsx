@@ -29,7 +29,7 @@ export default function PublicNavbar({ activeRaffle }) {
               <a
                 key={link.href}
                 href={link.href}
-                className="rounded-full px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white"
+                className="filter-pill filter-pill-idle"
               >
                 {link.label}
               </a>
@@ -39,8 +39,8 @@ export default function PublicNavbar({ activeRaffle }) {
                 to={link.to}
                 end={link.end}
                 className={({ isActive }) =>
-                  `rounded-full px-4 py-2 text-sm font-semibold transition ${
-                    isActive ? 'bg-mist text-white' : 'text-slate-600 hover:bg-white'
+                  `filter-pill ${
+                    isActive ? 'filter-pill-active' : 'text-slate-600 hover:bg-white'
                   }`
                 }
               >
@@ -67,7 +67,7 @@ export default function PublicNavbar({ activeRaffle }) {
               <a
                 key={link.href}
                 href={link.href}
-                className="whitespace-nowrap rounded-full border border-dashed border-sand bg-white/80 px-4 py-2 text-sm font-semibold text-slate-600 transition"
+                className="filter-pill filter-pill-idle whitespace-nowrap"
               >
                 {link.label}
               </a>
@@ -77,10 +77,8 @@ export default function PublicNavbar({ activeRaffle }) {
                 to={link.to}
                 end={link.end}
                 className={({ isActive }) =>
-                  `whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
-                    isActive
-                      ? 'bg-mist text-white'
-                      : 'border border-dashed border-sand bg-white/80 text-slate-600'
+                  `filter-pill whitespace-nowrap ${
+                    isActive ? 'filter-pill-active' : 'filter-pill-idle'
                   }`
                 }
               >

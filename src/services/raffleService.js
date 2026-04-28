@@ -22,16 +22,22 @@ function buildRaffleSummary(raffle, numbers = []) {
   const availableCount = numbers.filter((number) => number.status === 'available').length
   const winnerCount = numbers.filter((number) => number.status === 'winner').length
   const unitPrice = Number(raffle?.price_per_number || 0)
+  const paidLikeCount = paidCount + winnerCount
+  const total = numbers.length
+  const potentialRevenue = unitPrice * total
+  const paidRevenue = unitPrice * paidLikeCount
 
   return {
-    total: numbers.length,
+    total,
     availableCount,
     reservedCount,
     paidCount,
     winnerCount,
-    potentialRevenue: unitPrice * numbers.length,
+    isComplete: total > 0 && availableCount === 0,
+    potentialRevenue,
     reservedRevenue: unitPrice * reservedCount,
-    paidRevenue: unitPrice * paidCount,
+    paidRevenue,
+    pendingRevenue: Math.max(potentialRevenue - paidRevenue, 0),
   }
 }
 
@@ -258,4 +264,32 @@ export async function updateRaffleNumber(id, payload) {
 
 export function getRaffleSummary(raffle, numbers) {
   return buildRaffleSummary(raffle, numbers)
+}
+
+export async function deleteRaffle(raffleId) {
+  ensureSupabaseConfigured()
+
+  const { error: imagesError } = await supabase
+    .from('raffle_images')
+    .delete()
+    .eq('raffle_id', raffleId)
+
+  if (imagesError) {
+    throw imagesError
+  }
+
+  const { error: numbersError } = await supabase
+    .from('raffle_numbers')
+    .delete()
+    .eq('raffle_id', raffleId)
+
+  if (numbersError) {
+    throw numbersError
+  }
+
+  const { error } = await supabase.from('raffles').delete().eq('id', raffleId)
+
+  if (error) {
+    throw error
+  }
 }

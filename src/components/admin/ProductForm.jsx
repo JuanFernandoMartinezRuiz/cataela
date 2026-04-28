@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import CategoryModal from './CategoryModal'
 import ImagePlaceholder from '../common/ImagePlaceholder'
+import { useToast } from '../../providers/ToastProvider'
 
 const initialState = {
   name: '',
@@ -23,7 +24,9 @@ export default function ProductForm({
   onDeleteImage,
   onCreateCategory,
 }) {
+  const { showToast } = useToast()
   const [formValues, setFormValues] = useState(initialState)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [mainImageFile, setMainImageFile] = useState(null)
   const [mainPreview, setMainPreview] = useState('')
   const [galleryFiles, setGalleryFiles] = useState([])
@@ -45,6 +48,7 @@ export default function ProductForm({
       isActive: Boolean(initialValues.is_active),
     })
     setMainPreview(initialValues.main_image_url || '')
+    setFieldErrors({})
   }, [initialValues])
 
   useEffect(() => {
@@ -58,6 +62,15 @@ export default function ProductForm({
       ...current,
       [field]: value,
     }))
+    setFieldErrors((current) => {
+      if (!current[field]) {
+        return current
+      }
+
+      const nextErrors = { ...current }
+      delete nextErrors[field]
+      return nextErrors
+    })
   }
 
   function handleMainImageChange(event) {
@@ -79,16 +92,36 @@ export default function ProductForm({
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    const nextFieldErrors = {}
 
-    if (
-      !formValues.name.trim() ||
-      !formValues.description.trim() ||
-      !formValues.price ||
-      !formValues.categoryId
-    ) {
-      setError('Completa nombre, descripcion, precio y categoria.')
+    if (!formValues.name.trim()) {
+      nextFieldErrors.name = 'Este campo es obligatorio.'
+    }
+
+    if (!formValues.categoryId) {
+      nextFieldErrors.categoryId = 'Este campo es obligatorio.'
+    }
+
+    if (!formValues.price) {
+      nextFieldErrors.price = 'Este campo es obligatorio.'
+    }
+
+    if (!formValues.description.trim()) {
+      nextFieldErrors.description = 'Este campo es obligatorio.'
+    }
+
+    if (Object.keys(nextFieldErrors).length) {
+      setFieldErrors(nextFieldErrors)
+      setError('Revisa los campos.')
+      showToast({
+        title: 'Revisa los campos',
+        description: 'Completa la informacion obligatoria del producto.',
+        tone: 'error',
+      })
       return
     }
+
+    setFieldErrors({})
 
     try {
       await onSubmit({
@@ -116,21 +149,21 @@ export default function ProductForm({
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="admin-panel p-6">
           <div className="grid gap-5 md:grid-cols-2">
-          <Field label="Nombre">
+          <Field label="Nombre" error={fieldErrors.name} required>
             <input
               value={formValues.name}
               onChange={(event) => updateValue('name', event.target.value)}
-              className="field-input"
+              className={getFieldInputClassName(fieldErrors.name)}
               placeholder="Ej. Vela Mini Ramo"
             />
           </Field>
 
-            <Field label="Categoria">
+            <Field label="Categoria" error={fieldErrors.categoryId} required>
               <div className="flex flex-col gap-3">
                 <select
                   value={formValues.categoryId}
                   onChange={(event) => updateValue('categoryId', event.target.value)}
-                  className="field-input"
+                  className={getFieldInputClassName(fieldErrors.categoryId)}
                 >
                   <option value="">Selecciona una categoria</option>
                   {categories.map((category) => (
@@ -149,13 +182,13 @@ export default function ProductForm({
               </div>
             </Field>
 
-            <Field label="Precio (COP)">
+            <Field label="Precio (COP)" error={fieldErrors.price} required>
               <input
                 type="number"
                 min="0"
                 value={formValues.price}
                 onChange={(event) => updateValue('price', event.target.value)}
-                className="field-input"
+                className={getFieldInputClassName(fieldErrors.price)}
                 placeholder="20000"
               />
             </Field>
@@ -174,12 +207,12 @@ export default function ProductForm({
             </Field>
           </div>
 
-          <Field label="Descripcion" className="mt-5">
+          <Field label="Descripcion" className="mt-5" error={fieldErrors.description} required>
             <textarea
               rows="5"
               value={formValues.description}
               onChange={(event) => updateValue('description', event.target.value)}
-              className="field-input"
+              className={getFieldInputClassName(fieldErrors.description)}
               placeholder="Describe aroma, detalles y uso ideal."
             />
           </Field>
@@ -217,7 +250,7 @@ export default function ProductForm({
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               {existingGallery.map((image) => (
-                <div key={image.id} className="rounded-[1.5rem] border border-dashed border-sand bg-petal/75 p-3">
+                <div key={image.id} className="rounded-[1.5rem] border border-dashed border-mist/55 bg-white/82 p-3">
                   <img
                     src={image.image_url}
                     alt="Imagen adicional"
@@ -226,7 +259,8 @@ export default function ProductForm({
                   <button
                     type="button"
                     onClick={() => onDeleteImage(image)}
-                    className="btn-ghost mt-3 w-full"
+                    disabled={saving}
+                    className="btn-danger mt-3 w-full disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     Eliminar imagen
                   </button>
@@ -249,7 +283,11 @@ export default function ProductForm({
         {!error && warning ? <p className="text-sm text-amber-700">{warning}</p> : null}
 
         <div className="flex flex-wrap gap-3">
-          <button type="submit" disabled={saving || loading} className="btn-primary">
+          <button
+            type="submit"
+            disabled={saving || loading}
+            className="btn-primary disabled:cursor-not-allowed disabled:opacity-70"
+          >
             {saving ? saveLabel || 'Guardando producto...' : 'Guardar producto'}
           </button>
           <Link to="/admin/productos" className="btn-secondary">
@@ -269,11 +307,19 @@ export default function ProductForm({
   )
 }
 
-function Field({ label, children, className = '' }) {
+function Field({ label, children, className = '', error = '', required = false }) {
   return (
     <div className={className}>
-      <label className="field-label">{label}</label>
+      <label className="field-label">
+        {label}
+        {required ? <span className="ml-1 text-rose-700">*</span> : null}
+      </label>
       {children}
+      {error ? <p className="field-error">{error}</p> : null}
     </div>
   )
+}
+
+function getFieldInputClassName(hasError) {
+  return `field-input ${hasError ? 'field-input-error' : ''}`.trim()
 }

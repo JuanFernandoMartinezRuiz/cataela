@@ -309,3 +309,17 @@ export async function deleteProductAssets(product) {
     }
   }
 }
+
+export async function deleteRaffleAssets(raffle) {
+  ensureSupabaseConfigured()
+
+  if (raffle.main_image_url) {
+    await deleteStoredAsset(raffle.main_image_url, supabaseBuckets.raffleImages)
+  }
+
+  for (const image of raffle.gallery ?? []) {
+    if (image.image_url) {
+      await deleteStoredAsset(image.image_url, supabaseBuckets.raffleImages)
+    }
+  }
+}

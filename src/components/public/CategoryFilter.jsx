@@ -4,13 +4,11 @@ export default function CategoryFilter({ categories, currentCategory, onChange }
       <button
         type="button"
         onClick={() => onChange('all')}
-        className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-          currentCategory === 'all'
-            ? 'bg-slate-700 text-white'
-            : 'border border-dashed border-sand bg-white/80 text-slate-600'
+        className={`filter-pill ${
+          currentCategory === 'all' ? 'filter-pill-active' : 'filter-pill-idle'
         }`}
       >
-        Todas
+        Todos
       </button>
 
       {categories.map((category) => (
@@ -18,10 +16,10 @@ export default function CategoryFilter({ categories, currentCategory, onChange }
           key={category.id}
           type="button"
           onClick={() => onChange(category.slug)}
-          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+          className={`filter-pill ${
             currentCategory === category.slug
-              ? 'bg-mist text-white'
-              : 'border border-dashed border-sand bg-white/80 text-slate-600'
+              ? 'filter-pill-active'
+              : 'filter-pill-idle'
           }`}
         >
           {category.name}

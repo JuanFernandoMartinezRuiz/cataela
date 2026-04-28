@@ -18,7 +18,7 @@ export default function FinanceChart({ data, groupedBy }) {
         <div>
           <h2 className="font-display text-3xl text-slate-700">Evolucion financiera</h2>
           <p className="mt-2 text-sm text-slate-500">
-            Comparativo de ingresos vs egresos {groupedBy === 'month' ? 'por mes' : 'por fecha'}.
+            Comparativo de ingresos pagados, egresos pagados y utilidad {groupedBy === 'month' ? 'por mes' : 'por fecha'}.
           </p>
         </div>
       </div>
@@ -37,31 +37,41 @@ export default function FinanceChart({ data, groupedBy }) {
               <Tooltip formatter={(value) => formatCurrency(Number(value || 0))} />
               <Legend />
               <Bar
-                dataKey="income"
-                name="Ingresos"
-                fill="#a9b8c8"
+                dataKey="paidIncome"
+                name="Ingresos pagados"
+                fill="#c7dcc1"
                 radius={[10, 10, 0, 0]}
               />
               <Bar
-                dataKey="expense"
-                name="Egresos"
-                fill="#ddc6b2"
+                dataKey="paidExpense"
+                name="Egresos pagados"
+                fill="#a9b8c8"
                 radius={[10, 10, 0, 0]}
               />
               <Line
                 type="monotone"
-                dataKey="net"
-                name="Ganancia neta"
-                stroke="#d890a3"
+                dataKey="realProfit"
+                name="Ganancia real"
+                stroke="#bea18c"
                 strokeWidth={3}
-                dot={{ r: 4, fill: '#d890a3' }}
+                dot={{ r: 4, fill: '#bea18c' }}
                 activeDot={{ r: 6 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="expectedProfit"
+                name="Ganancia esperada"
+                stroke="#d3bcc4"
+                strokeDasharray="6 5"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 5 }}
               />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="mt-6 rounded-[1.5rem] border border-dashed border-sand bg-petal/75 p-6 text-sm text-slate-500">
+        <div className="mt-6 rounded-[1.5rem] border border-dashed border-mist/55 bg-white/82 p-6 text-sm text-slate-500">
           Aun no hay datos suficientes en este rango para mostrar la evolucion financiera.
         </div>
       )}
