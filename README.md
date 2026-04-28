@@ -67,6 +67,20 @@ Ese archivo crea:
 - `finance_transactions`
 - `finance_categories`
 
+Para el ajuste visual de la foto principal del catalogo, `products` tambien debe tener:
+
+- `image_position_x numeric not null default 50`
+- `image_position_y numeric not null default 50`
+- `image_zoom numeric not null default 1`
+
+Si tu tabla `products` ya existia antes, ejecuta tambien estos `alter table`:
+
+```sql
+alter table public.products add column if not exists image_position_x numeric not null default 50;
+alter table public.products add column if not exists image_position_y numeric not null default 50;
+alter table public.products add column if not exists image_zoom numeric not null default 1;
+```
+
 Tambien agrega:
 
 - `uuid` por defecto con `gen_random_uuid()`

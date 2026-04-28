@@ -1,4 +1,5 @@
 import ImagePlaceholder from '../common/ImagePlaceholder'
+import { buildProductImageStyle } from '../../utils/productImageSettings'
 
 export default function ProductGallery({ product, selectedImage, onSelectImage }) {
   const gallery = [
@@ -18,6 +19,7 @@ export default function ProductGallery({ product, selectedImage, onSelectImage }
             src={selectedImage}
             alt={product.name}
             className="h-[420px] w-full rounded-[1.75rem] object-cover md:h-[520px]"
+            style={selectedImage === product.main_image_url ? buildProductImageStyle(product) : undefined}
           />
         ) : (
           <ImagePlaceholder label={product.name} className="h-[420px] w-full md:h-[520px]" />
@@ -44,6 +46,7 @@ export default function ProductGallery({ product, selectedImage, onSelectImage }
                   src={image.image_url}
                   alt={product.name}
                   className="h-20 w-full rounded-[1rem] object-cover sm:h-24"
+                  style={image.image_url === product.main_image_url ? buildProductImageStyle(product) : undefined}
                 />
               </button>
             )

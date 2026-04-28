@@ -1,4 +1,5 @@
 import { ensureSupabaseConfigured, supabase } from '../lib/supabaseClient'
+import { normalizeProductImageSettings } from '../utils/productImageSettings'
 
 const productSelect = `
   id,
@@ -8,6 +9,9 @@ const productSelect = `
   price,
   category_id,
   main_image_url,
+  image_position_x,
+  image_position_y,
+  image_zoom,
   is_active,
   created_at,
   categories (
@@ -25,8 +29,11 @@ const productSelect = `
 `
 
 function normalizeProduct(product) {
+  const imageSettings = normalizeProductImageSettings(product)
+
   return {
     ...product,
+    ...imageSettings,
     category: product.categories ?? null,
     gallery: [...(product.product_images ?? [])].sort(
       (left, right) => left.sort_order - right.sort_order,

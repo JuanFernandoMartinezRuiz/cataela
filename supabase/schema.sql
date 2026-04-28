@@ -15,9 +15,21 @@ create table if not exists public.products (
   price numeric not null default 0,
   category_id uuid references public.categories(id) on delete set null,
   main_image_url text,
+  image_position_x numeric not null default 50,
+  image_position_y numeric not null default 50,
+  image_zoom numeric not null default 1,
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+alter table public.products
+  add column if not exists image_position_x numeric not null default 50;
+
+alter table public.products
+  add column if not exists image_position_y numeric not null default 50;
+
+alter table public.products
+  add column if not exists image_zoom numeric not null default 1;
 
 create table if not exists public.product_images (
   id uuid primary key default gen_random_uuid(),

@@ -1,17 +1,23 @@
 import { Link } from 'react-router-dom'
 import { buildWhatsAppProductLink, formatCurrency, truncateText } from '../../utils/formatters'
 import ImagePlaceholder from '../common/ImagePlaceholder'
+import { buildProductImageStyle } from '../../utils/productImageSettings'
 
 export default function ProductCard({ product }) {
   return (
     <article className="group card-dashed-blue overflow-hidden p-4 transition duration-300 hover:-translate-y-1.5 hover:bg-white hover:shadow-card">
       <div className="overflow-hidden rounded-[1.6rem]">
         {product.main_image_url ? (
-          <img
-            src={product.main_image_url}
-            alt={product.name}
-            className="h-64 w-full object-cover transition duration-500 group-hover:scale-[1.04]"
-          />
+          <div className="h-64 w-full overflow-hidden rounded-[1.6rem]">
+            <div className="h-full w-full transition duration-500 group-hover:scale-[1.04]">
+              <img
+                src={product.main_image_url}
+                alt={product.name}
+                className="h-full w-full object-cover"
+                style={buildProductImageStyle(product)}
+              />
+            </div>
+          </div>
         ) : (
           <ImagePlaceholder label={product.name} className="h-64 w-full" />
         )}

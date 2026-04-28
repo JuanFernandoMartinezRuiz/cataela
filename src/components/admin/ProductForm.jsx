@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import CategoryModal from './CategoryModal'
 import ImagePlaceholder from '../common/ImagePlaceholder'
 import { useToast } from '../../providers/ToastProvider'
+import { buildProductImageStyle } from '../../utils/productImageSettings'
 
 const initialState = {
   name: '',
@@ -10,6 +11,9 @@ const initialState = {
   price: '',
   categoryId: '',
   isActive: true,
+  imagePositionX: 50,
+  imagePositionY: 50,
+  imageZoom: 1,
 }
 
 export default function ProductForm({
@@ -46,6 +50,9 @@ export default function ProductForm({
       price: initialValues.price || '',
       categoryId: initialValues.category_id || '',
       isActive: Boolean(initialValues.is_active),
+      imagePositionX: initialValues.image_position_x ?? 50,
+      imagePositionY: initialValues.image_position_y ?? 50,
+      imageZoom: initialValues.image_zoom ?? 1,
     })
     setMainPreview(initialValues.main_image_url || '')
     setFieldErrors({})
@@ -238,6 +245,85 @@ export default function ProductForm({
           </div>
 
           <div className="admin-panel p-6">
+            <div>
+              <h3 className="font-display text-3xl text-slate-700">Ajuste de portada</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Controla como se recorta la foto principal dentro de la card del catalogo.
+              </p>
+            </div>
+
+            {mainPreview ? (
+              <>
+                <div className="mt-5 rounded-[1.75rem] border border-dashed border-mist/55 bg-white/82 p-4">
+                  <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
+                    Vista previa de la card
+                  </p>
+                  <div className="mt-4 rounded-[1.6rem] border border-dashed border-mist/55 bg-white p-4 shadow-soft">
+                    <div className="overflow-hidden rounded-[1.45rem]">
+                      <div className="h-64 w-full overflow-hidden rounded-[1.45rem]">
+                        <img
+                          src={mainPreview}
+                          alt="Vista previa de portada"
+                          className="h-full w-full object-cover"
+                          style={buildProductImageStyle({
+                            image_position_x: formValues.imagePositionX,
+                            image_position_y: formValues.imagePositionY,
+                            image_zoom: formValues.imageZoom,
+                          })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
+                        {categories.find((category) => category.id === formValues.categoryId)?.name ||
+                          'Coleccion Cataela'}
+                      </p>
+                      <p className="mt-2 font-display text-3xl text-slate-700">
+                        {formValues.name || 'Nombre del producto'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 space-y-5">
+                  <RangeField
+                    label="Posicion horizontal"
+                    value={Number(formValues.imagePositionX || 50)}
+                    min={0}
+                    max={100}
+                    step={1}
+                    displayValue={`${Math.round(Number(formValues.imagePositionX || 50))}%`}
+                    onChange={(value) => updateValue('imagePositionX', value)}
+                  />
+                  <RangeField
+                    label="Posicion vertical"
+                    value={Number(formValues.imagePositionY || 50)}
+                    min={0}
+                    max={100}
+                    step={1}
+                    displayValue={`${Math.round(Number(formValues.imagePositionY || 50))}%`}
+                    onChange={(value) => updateValue('imagePositionY', value)}
+                  />
+                  <RangeField
+                    label="Zoom"
+                    value={Number(formValues.imageZoom || 1)}
+                    min={1}
+                    max={2.5}
+                    step={0.01}
+                    displayValue={`${Number(formValues.imageZoom || 1).toFixed(2)}x`}
+                    onChange={(value) => updateValue('imageZoom', value)}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="mt-5 rounded-[1.5rem] border border-dashed border-mist/55 bg-white/82 p-5 text-sm text-slate-500">
+                Sube una foto principal para ajustar su recorte dentro de la card del catalogo.
+              </div>
+            )}
+          </div>
+
+          <div className="admin-panel p-6 xl:col-span-2">
             <Field label="Galeria adicional">
               <input
                 type="file"
@@ -248,7 +334,7 @@ export default function ProductForm({
               />
             </Field>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {existingGallery.map((image) => (
                 <div key={image.id} className="rounded-[1.5rem] border border-dashed border-mist/55 bg-white/82 p-3">
                   <img
@@ -322,4 +408,32 @@ function Field({ label, children, className = '', error = '', required = false }
 
 function getFieldInputClassName(hasError) {
   return `field-input ${hasError ? 'field-input-error' : ''}`.trim()
+}
+
+function RangeField({
+  label,
+  value,
+  min,
+  max,
+  step,
+  displayValue,
+  onChange,
+}) {
+  return (
+    <div className="rounded-[1.5rem] border border-dashed border-mist/55 bg-white/82 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <label className="text-sm font-semibold text-slate-600">{label}</label>
+        <span className="text-sm font-semibold text-slate-500">{displayValue}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="mt-4 h-2 w-full cursor-pointer appearance-none rounded-full bg-mist/20 accent-mist"
+      />
+    </div>
+  )
 }

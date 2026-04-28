@@ -94,6 +94,9 @@ export default function AdminProductFormPage() {
         description: values.description.trim(),
         price: Number(values.price),
         category_id: values.categoryId,
+        image_position_x: Number(values.imagePositionX ?? 50),
+        image_position_y: Number(values.imagePositionY ?? 50),
+        image_zoom: Number(values.imageZoom ?? 1),
         is_active: values.isActive,
       }
 
