@@ -22,7 +22,7 @@ const rangeOptions = [
   { value: 'day', label: 'Dia actual' },
   { value: 'week', label: 'Semana actual' },
   { value: 'month', label: 'Mes actual' },
-  { value: 'year', label: 'Ano actual' },
+  { value: 'year', label: 'Año actual' },
   { value: 'custom', label: 'Rango personalizado' },
 ]
 
