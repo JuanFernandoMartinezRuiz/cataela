@@ -16,7 +16,7 @@ const values = [
     Icon: HomeSparkIcon,
   },
   {
-    title: 'Disenos unicos y personalizados',
+    title: 'Diseños unicos y personalizados',
     description:
       'Creamos propuestas con esencia propia para que cada vela se sienta cercana, especial y hecha para ti.',
     tone: 'green',
