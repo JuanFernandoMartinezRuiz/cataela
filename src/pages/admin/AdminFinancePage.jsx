@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import * as XLSX from 'xlsx'
 import EmptyState from '../../components/common/EmptyState'
 import ErrorState from '../../components/common/ErrorState'
 import LoadingState from '../../components/common/LoadingState'
@@ -18,16 +19,21 @@ import {
 import { formatCurrency, formatDate } from '../../utils/formatters'
 
 const rangeOptions = [
+  { value: 'day', label: 'Dia actual' },
   { value: 'week', label: 'Semana actual' },
   { value: 'month', label: 'Mes actual' },
   { value: 'year', label: 'Ano actual' },
   { value: 'custom', label: 'Rango personalizado' },
 ]
 
-const movementFilters = [
+const typeFilters = [
   { value: 'all', label: 'Todos' },
   { value: 'income', label: 'Ingresos' },
   { value: 'expense', label: 'Egresos' },
+]
+
+const statusFilters = [
+  { value: 'all', label: 'Todos los estados' },
   { value: 'completed', label: 'Completados' },
   { value: 'pending', label: 'Pendientes' },
   { value: 'partial', label: 'Parciales' },
@@ -38,7 +44,8 @@ export default function AdminFinancePage() {
   const [financeCategories, setFinanceCategories] = useState([])
   const [transactions, setTransactions] = useState([])
   const [rangeType, setRangeType] = useState('month')
-  const [movementFilter, setMovementFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [customRange, setCustomRange] = useState({
     startDate: '',
     endDate: '',
@@ -50,6 +57,7 @@ export default function AdminFinancePage() {
   const [savingCategory, setSavingCategory] = useState(false)
   const [deletingId, setDeletingId] = useState('')
   const [completingId, setCompletingId] = useState('')
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
 
   const activeRange = useMemo(
@@ -252,8 +260,8 @@ export default function AdminFinancePage() {
   }
 
   const filteredTransactions = useMemo(
-    () => filterTransactions(transactions, movementFilter),
-    [transactions, movementFilter],
+    () => filterTransactions(transactions, typeFilter, statusFilter),
+    [transactions, typeFilter, statusFilter],
   )
 
   const summary = useMemo(
@@ -265,6 +273,80 @@ export default function AdminFinancePage() {
     () => buildChartData(filteredTransactions, rangeType),
     [filteredTransactions, rangeType],
   )
+
+  const activeFilterLabel = useMemo(() => {
+    const typeLabel = typeFilters.find((option) => option.value === typeFilter)?.label || 'Todos'
+    const statusLabel =
+      statusFilters.find((option) => option.value === statusFilter)?.label ||
+      'Todos los estados'
+    return `${typeLabel}, ${statusLabel}`
+  }, [typeFilter, statusFilter])
+
+  async function handleExportExcel() {
+    if (!filteredTransactions.length) {
+      showToast({
+        title: 'No hay datos para exportar',
+        description: 'Ajusta el rango o los filtros para generar el archivo.',
+        tone: 'warning',
+      })
+      return
+    }
+
+    try {
+      setExporting(true)
+
+      const workbook = XLSX.utils.book_new()
+      const summarySheet = XLSX.utils.aoa_to_sheet(
+        buildSummarySheetRows(activeRange, activeFilterLabel, summary),
+      )
+      const movementsSheet = XLSX.utils.json_to_sheet(
+        filteredTransactions.map((transaction) => ({
+          Fecha: transaction.transaction_date || '',
+          Tipo: transaction.type === 'income' ? 'Ingreso' : 'Egreso',
+          Estado: translateFinanceStatus(transaction.status),
+          Categoria: transaction.category || 'Sin categoria',
+          Descripcion: transaction.description || '',
+          'Metodo de pago': transaction.payment_method || 'Sin metodo',
+          Total: Number(transaction.amount || 0),
+          Pagado: Number(transaction.paid_amount || 0),
+          Restante: Number(transaction.remaining_amount || 0),
+        })),
+      )
+
+      applyCurrencyFormat(summarySheet, ['B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11'])
+      applyCurrencyFormatByHeader(movementsSheet, ['Total', 'Pagado', 'Restante'])
+      summarySheet['!cols'] = [{ wch: 24 }, { wch: 22 }]
+      movementsSheet['!cols'] = [
+        { wch: 14 },
+        { wch: 12 },
+        { wch: 22 },
+        { wch: 20 },
+        { wch: 38 },
+        { wch: 20 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 14 },
+      ]
+
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen')
+      XLSX.utils.book_append_sheet(workbook, movementsSheet, 'Movimientos')
+      XLSX.writeFile(workbook, `finanzas-cataela-${getTodayFileStamp()}.xlsx`)
+
+      showToast({
+        title: 'Exportacion lista',
+        description: 'El archivo Excel se genero correctamente.',
+        tone: 'success',
+      })
+    } catch (exportError) {
+      showToast({
+        title: 'Error al exportar',
+        description: exportError.message || 'No fue posible generar el archivo Excel.',
+        tone: 'error',
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <>
@@ -345,6 +427,14 @@ export default function AdminFinancePage() {
                 Combina el rango de fechas con filtros de tipo o estado para entender mejor lo cobrado, lo pendiente y la utilidad del negocio.
               </p>
             </div>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={exporting || loading}
+              className="btn-primary disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {exporting ? 'Exportando...' : 'Exportar Excel'}
+            </button>
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">
@@ -396,13 +486,30 @@ export default function AdminFinancePage() {
           ) : null}
 
           <div className="mt-6 flex flex-wrap gap-2">
-            {movementFilters.map((option) => (
+            {typeFilters.map((option) => (
               <button
                 key={option.value}
                 type="button"
-                onClick={() => setMovementFilter(option.value)}
+                onClick={() => setTypeFilter(option.value)}
                 className={`filter-pill ${
-                  movementFilter === option.value
+                  typeFilter === option.value
+                    ? 'filter-pill-active'
+                    : 'filter-pill-idle'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {statusFilters.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setStatusFilter(option.value)}
+                className={`filter-pill ${
+                  statusFilter === option.value
                     ? 'filter-pill-active'
                     : 'filter-pill-idle'
                 }`}
@@ -424,7 +531,7 @@ export default function AdminFinancePage() {
                 Filtro aplicado
               </p>
               <p className="mt-2 text-sm text-slate-700">
-                {movementFilters.find((option) => option.value === movementFilter)?.label}
+                {activeFilterLabel}
               </p>
             </div>
           </div>
@@ -586,17 +693,11 @@ function PaymentProgress({ transaction }) {
   )
 }
 
-function filterTransactions(transactions, movementFilter) {
-  if (movementFilter === 'all') {
-    return transactions
-  }
-
+function filterTransactions(transactions, typeFilter, statusFilter) {
   return transactions.filter((transaction) => {
-    if (movementFilter === 'income' || movementFilter === 'expense') {
-      return transaction.type === movementFilter
-    }
-
-    return transaction.status === movementFilter
+    const matchesType = typeFilter === 'all' ? true : transaction.type === typeFilter
+    const matchesStatus = statusFilter === 'all' ? true : transaction.status === statusFilter
+    return matchesType && matchesStatus
   })
 }
 
@@ -697,6 +798,13 @@ function buildDateRange(rangeType, customRange) {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
+  if (rangeType === 'day') {
+    return {
+      startDate: toDateInputValue(today),
+      endDate: toDateInputValue(today),
+    }
+  }
+
   if (rangeType === 'week') {
     const day = today.getDay()
     const offset = day === 0 ? -6 : 1 - day
@@ -775,4 +883,60 @@ function getProgressPercentage(transaction) {
   }
 
   return Math.max(0, Math.min(100, (paidAmount / amount) * 100))
+}
+
+function buildSummarySheetRows(activeRange, activeFilterLabel, summary) {
+  return [
+    ['Resumen financiero'],
+    [`Rango: ${activeRange.startDate} al ${activeRange.endDate}`],
+    [`Filtro: ${activeFilterLabel}`],
+    [],
+    ['Ingresos totales', Number(summary.totalIncomeExpected || 0)],
+    ['Egresos totales', Number(summary.totalExpenseExpected || 0)],
+    ['Ganancia real', Number(summary.realProfit || 0)],
+    ['Ganancia esperada', Number(summary.expectedProfit || 0)],
+    ['Pendientes por cobrar', Number(summary.pendingReceivables || 0)],
+    ['Pendientes por pagar', Number(summary.pendingPayables || 0)],
+    ['Ingresos pagados', Number(summary.paidIncome || 0)],
+    ['Egresos pagados', Number(summary.paidExpense || 0)],
+  ]
+}
+
+function applyCurrencyFormat(sheet, cellRefs) {
+  cellRefs.forEach((cellRef) => {
+    if (sheet[cellRef]) {
+      sheet[cellRef].z = '"COP" #,##0'
+    }
+  })
+}
+
+function applyCurrencyFormatByHeader(sheet, headers) {
+  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1')
+  const headerMap = {}
+
+  for (let column = range.s.c; column <= range.e.c; column += 1) {
+    const headerCell = sheet[XLSX.utils.encode_cell({ r: 0, c: column })]
+    if (headerCell?.v) {
+      headerMap[headerCell.v] = column
+    }
+  }
+
+  headers.forEach((header) => {
+    const column = headerMap[header]
+
+    if (column === undefined) {
+      return
+    }
+
+    for (let row = 1; row <= range.e.r; row += 1) {
+      const cellRef = XLSX.utils.encode_cell({ r: row, c: column })
+      if (sheet[cellRef]) {
+        sheet[cellRef].z = '"COP" #,##0'
+      }
+    }
+  })
+}
+
+function getTodayFileStamp() {
+  return new Date().toISOString().slice(0, 10)
 }
