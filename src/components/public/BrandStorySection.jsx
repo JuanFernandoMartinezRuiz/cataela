@@ -45,7 +45,15 @@ const toneClasses = {
 export default function BrandStorySection() {
   return (
     <section className="page-section">
-      <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+      <div className="relative overflow-hidden rounded-[2.2rem]">
+        <div className="pointer-events-none absolute -left-10 top-8 hidden opacity-[0.06] lg:block">
+          <WatercolorBloom className="h-28 w-28 text-roseDeep" />
+        </div>
+        <div className="pointer-events-none absolute -right-8 bottom-6 hidden opacity-[0.05] lg:block">
+          <WatercolorBloom className="h-24 w-24 text-mist" />
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
         <PageHeading
           eyebrow="Sobre la marca"
           title="Detalles artesanales con aroma y calidez"
@@ -59,23 +67,31 @@ export default function BrandStorySection() {
             return (
               <article
                 key={title}
-                className={`rounded-[1.8rem] border border-dashed p-7 shadow-soft transition duration-300 ease-out hover:scale-[1.02] hover:shadow-card ${styles.card}`}
+                className={`relative overflow-hidden rounded-[1.8rem] border border-dashed p-7 shadow-soft transition duration-300 ease-out hover:scale-[1.02] hover:shadow-card ${styles.card}`}
               >
+                <div className="pointer-events-none absolute -right-5 top-4 opacity-[0.05]">
+                  <LeafOrnament className="h-14 w-14 text-slate-500" />
+                </div>
+                <div className="pointer-events-none absolute -left-4 bottom-3 opacity-[0.05]">
+                  <MiniBloom className="h-12 w-12 text-slate-500" />
+                </div>
+
                 <div
-                  className={`flex h-14 w-14 items-center justify-center rounded-full ${styles.iconWrap}`}
+                  className={`relative z-[1] flex h-14 w-14 items-center justify-center rounded-full ${styles.iconWrap}`}
                 >
                   <Icon className="h-6 w-6" />
                 </div>
 
-                <h3 className="mt-5 font-display text-[1.9rem] leading-tight text-slate-700">
+                <h3 className="relative z-[1] mt-5 font-display text-[1.9rem] leading-tight text-slate-700">
                   {title}
                 </h3>
-                <div className={`mt-3 h-[2px] w-14 rounded-full ${styles.line}`} />
-                <p className="mt-4 text-sm leading-7 text-slate-500">{description}</p>
+                <div className={`relative z-[1] mt-3 h-[2px] w-14 rounded-full ${styles.line}`} />
+                <p className="relative z-[1] mt-4 text-sm leading-7 text-slate-500">{description}</p>
               </article>
             )
           })}
         </div>
+      </div>
       </div>
     </section>
   )
@@ -124,6 +140,40 @@ function HeartWandIcon({ className = '' }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  )
+}
+
+function WatercolorBloom({ className = '' }) {
+  return (
+    <svg viewBox="0 0 120 120" fill="none" className={className}>
+      <path
+        d="M60 16c8 18 16 25 32 31-18 4-26 12-32 30-6-18-14-26-32-30 18-6 26-13 32-31Z"
+        fill="currentColor"
+      />
+      <circle cx="60" cy="60" r="10" fill="currentColor" />
+      <path
+        d="M92 72c7 2 12 7 14 14-7-2-12-7-14-14ZM14 72c7 2 12 7 14 14-7-2-12-7-14-14Z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
+function LeafOrnament({ className = '' }) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" className={className}>
+      <path d="M17 46c11-3 22-15 28-29 2 13-1 23-9 31-6 6-13 8-19 7Z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M22 41c6-1 13-6 20-15" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function MiniBloom({ className = '' }) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" className={className}>
+      <path d="M32 18c3 7 7 11 14 14-7 2-11 6-14 13-3-7-7-11-14-13 7-3 11-7 14-14Z" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="32" cy="32" r="4" fill="currentColor" stroke="none" />
     </svg>
   )
 }
