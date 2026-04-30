@@ -644,6 +644,7 @@ export default function AdminFinancePage() {
                   <tr>
                     <th className="px-6 py-4">Fecha</th>
                     <th className="px-6 py-4">Descripcion</th>
+                    <th className="px-6 py-4 min-w-[220px]">Notas</th>
                     <th className="px-6 py-4">Tipo</th>
                     <th className="px-6 py-4">Estado</th>
                     <th className="px-6 py-4">Categoria</th>
@@ -660,23 +661,36 @@ export default function AdminFinancePage() {
                     <tr key={transaction.id} className="border-t border-sand/30 align-top">
                       <td className="px-6 py-4">{formatDate(transaction.transaction_date)}</td>
                       <td className="px-6 py-4">
-                        <div>
+                        <div className="space-y-1.5">
                           <p className="font-semibold text-slate-700">
                             {buildTransactionLabel(transaction)}
                           </p>
-                          {transaction.itemsSummary ? (
-                            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
-                              {transaction.itemsSummary}
-                            </p>
-                          ) : shouldShowProductMeta(transaction) ? (
-                            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
-                              Producto: {transaction.product.name}
+                          {getVisibleTransactionDescription(transaction) ? (
+                            <p
+                              className="text-sm leading-5 text-slate-500"
+                              title={getVisibleTransactionDescription(transaction)}
+                              style={clampToTwoLinesStyle}
+                            >
+                              {getVisibleTransactionDescription(transaction)}
                             </p>
                           ) : null}
                           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                             {formatDate(transaction.created_at)}
                           </p>
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {getLatestPaymentNote(transaction) ? (
+                          <p
+                            className="text-sm italic leading-5 text-slate-400"
+                            title={getLatestPaymentNote(transaction)}
+                            style={clampToTwoLinesStyle}
+                          >
+                            {getLatestPaymentNote(transaction)}
+                          </p>
+                        ) : (
+                          <span className="text-sm text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <StatusBadge tone={transaction.type === 'income' ? 'active' : 'inactive'}>
@@ -790,44 +804,48 @@ function PaymentProgress({ amount, paidAmount, remainingAmount, status }) {
 
 function buildTransactionLabel(transaction) {
   if (transaction.itemsSummary) {
-    const trimmedDescription = String(transaction.description || '').trim()
-
-    if (!trimmedDescription) {
-      return `Venta - ${transaction.itemsSummary}`
-    }
-
-    if (trimmedDescription.toLowerCase().includes(transaction.itemsSummary.toLowerCase())) {
-      return trimmedDescription
-    }
-
-    return `${trimmedDescription} - ${transaction.itemsSummary}`
+    return `Venta - ${transaction.itemsSummary}`
   }
 
   if (!transaction.product?.name) {
-    return transaction.description
+    return String(transaction.description || '').trim() || buildFallbackTransactionLabel(transaction)
   }
 
-  const trimmedDescription = String(transaction.description || '').trim()
-  const productName = transaction.product.name
-
-  if (!trimmedDescription) {
-    return `Venta - ${productName}`
-  }
-
-  if (trimmedDescription.toLowerCase().includes(productName.toLowerCase())) {
-    return trimmedDescription
-  }
-
-  return `${trimmedDescription} - ${productName}`
+  return `Venta - ${transaction.product.name}`
 }
 
-function shouldShowProductMeta(transaction) {
-  if (!transaction.product?.name) {
-    return false
+function buildFallbackTransactionLabel(transaction) {
+  if (transaction.type === 'expense') {
+    return `Egreso - ${transaction.category || 'Movimiento manual'}`
   }
 
-  const trimmedDescription = String(transaction.description || '').trim().toLowerCase()
-  return !trimmedDescription.includes(transaction.product.name.toLowerCase())
+  return `Ingreso - ${transaction.category || 'Movimiento manual'}`
+}
+
+function getVisibleTransactionDescription(transaction) {
+  const description = String(transaction.description || '').trim()
+  const title = String(buildTransactionLabel(transaction) || '').trim()
+
+  if (!description) {
+    return ''
+  }
+
+  return description.toLowerCase() === title.toLowerCase() ? '' : description
+}
+
+function getLatestPaymentNote(transaction) {
+  const notes = (transaction.payments ?? [])
+    .map((payment) => String(payment.note || '').trim())
+    .filter(Boolean)
+
+  return notes.at(-1) || ''
+}
+
+const clampToTwoLinesStyle = {
+  display: '-webkit-box',
+  WebkitBoxOrient: 'vertical',
+  WebkitLineClamp: 2,
+  overflow: 'hidden',
 }
 
 function buildPaidPayments(transaction) {
