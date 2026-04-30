@@ -78,6 +78,7 @@ create table if not exists public.finance_transactions (
   paid_amount numeric not null default 0,
   remaining_amount numeric not null default 0,
   product_id uuid references public.products(id) on delete set null,
+  quantity integer,
   description text not null,
   category text,
   payment_method text,
@@ -88,6 +89,19 @@ create table if not exists public.finance_transactions (
 
 alter table public.finance_transactions
   add column if not exists product_id uuid references public.products(id) on delete set null;
+
+alter table public.finance_transactions
+  add column if not exists quantity integer;
+
+create table if not exists public.finance_payments (
+  id uuid primary key default gen_random_uuid(),
+  transaction_id uuid not null references public.finance_transactions(id) on delete cascade,
+  payment_method text not null,
+  amount numeric not null default 0,
+  payment_date date not null,
+  note text,
+  created_at timestamptz not null default now()
+);
 
 create table if not exists public.finance_categories (
   id uuid primary key default gen_random_uuid(),

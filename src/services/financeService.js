@@ -7,6 +7,7 @@ const financeFields = `
   paid_amount,
   remaining_amount,
   product_id,
+  quantity,
   description,
   category,
   payment_method,
@@ -17,6 +18,15 @@ const financeFields = `
     id,
     name,
     price
+  ),
+  finance_payments (
+    id,
+    transaction_id,
+    payment_method,
+    amount,
+    payment_date,
+    note,
+    created_at
   )
 `
 
@@ -35,25 +45,142 @@ function normalizeFinanceError(error) {
   return error
 }
 
-function sanitizeFinancePayload(payload) {
-  return {
-    amount: payload.amount,
-    paid_amount: payload.paid_amount,
-    product_id: payload.product_id || null,
-    type: payload.type,
-    description: payload.description,
-    category: payload.category,
-    payment_method: payload.payment_method,
-    transaction_date: payload.transaction_date,
-    status: payload.status,
-  }
-}
-
 function normalizeFinanceTransaction(transaction) {
+  const payments = [...(transaction.finance_payments ?? [])].sort((left, right) =>
+    `${left.payment_date}-${left.created_at}`.localeCompare(
+      `${right.payment_date}-${right.created_at}`,
+    ),
+  )
+  const methodsLabel = buildPaymentMethodsLabel(payments)
+
   return {
     ...transaction,
     product: transaction.products ?? null,
+    payments,
+    payment_method: methodsLabel || transaction.payment_method || '',
   }
+}
+
+function sanitizeFinancePayload(payload) {
+  const paymentSummary = derivePaymentSummary(payload.amount, payload.payments)
+
+  return {
+    amount: payload.amount,
+    paid_amount: paymentSummary.paidAmount,
+    product_id: payload.product_id || null,
+    quantity: payload.product_id ? Number(payload.quantity || 1) : null,
+    type: payload.type,
+    description: payload.description,
+    category: payload.category,
+    payment_method: paymentSummary.methodsLabel,
+    transaction_date: payload.transaction_date,
+    status: paymentSummary.status,
+  }
+}
+
+function sanitizeFinancePayments(payments) {
+  return (payments ?? []).map((payment) => ({
+    payment_method: String(payment.payment_method || '').trim(),
+    amount: Number(payment.amount || 0),
+    payment_date: payment.payment_date,
+    note: String(payment.note || '').trim(),
+  }))
+}
+
+function derivePaymentSummary(amount, payments) {
+  const totalAmount = Number(amount || 0)
+  const cleanPayments = sanitizeFinancePayments(payments).filter(
+    (payment) => payment.amount > 0,
+  )
+  const rawPaidAmount = cleanPayments.reduce(
+    (sum, payment) => sum + Number(payment.amount || 0),
+    0,
+  )
+  const paidAmount =
+    totalAmount > 0 ? Math.min(rawPaidAmount, totalAmount) : rawPaidAmount
+
+  let status = 'pending'
+  if (paidAmount > 0 && paidAmount < totalAmount) {
+    status = 'partial'
+  } else if (totalAmount > 0 && paidAmount === totalAmount) {
+    status = 'completed'
+  }
+
+  return {
+    paidAmount,
+    remainingAmount: Math.max(0, totalAmount - paidAmount),
+    status,
+    isOverpaid: rawPaidAmount > totalAmount,
+    methodsLabel: buildPaymentMethodsLabel(cleanPayments),
+    payments: cleanPayments,
+  }
+}
+
+function buildPaymentMethodsLabel(payments) {
+  const uniqueMethods = [...new Set(
+    (payments ?? [])
+      .map((payment) => String(payment.payment_method || '').trim())
+      .filter(Boolean),
+  )]
+
+  return uniqueMethods.join(' + ')
+}
+
+async function fetchFinanceTransactionById(id) {
+  const { data, error } = await supabase
+    .from('finance_transactions')
+    .select(financeFields)
+    .eq('id', id)
+    .single()
+
+  if (error) {
+    throw normalizeFinanceError(error)
+  }
+
+  return normalizeFinanceTransaction(data)
+}
+
+async function replaceFinancePayments(transactionId, payments) {
+  const paymentRows = sanitizeFinancePayments(payments)
+
+  const { error: deleteError } = await supabase
+    .from('finance_payments')
+    .delete()
+    .eq('transaction_id', transactionId)
+
+  if (deleteError) {
+    throw normalizeFinanceError(deleteError)
+  }
+
+  if (!paymentRows.length) {
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from('finance_payments')
+    .insert(
+      paymentRows.map((payment) => ({
+        ...payment,
+        transaction_id: transactionId,
+      })),
+    )
+    .select(
+      `
+        id,
+        transaction_id,
+        payment_method,
+        amount,
+        payment_date,
+        note,
+        created_at
+      `,
+    )
+
+  if (error) {
+    throw normalizeFinanceError(error)
+  }
+
+  return data ?? []
 }
 
 export async function fetchFinanceTransactions({ startDate, endDate } = {}) {
@@ -116,15 +243,16 @@ export async function createFinanceCategory(payload) {
     throw normalizeFinanceError(error)
   }
 
-  return normalizeFinanceTransaction(data)
+  return data
 }
 
 export async function createFinanceTransaction(payload) {
   ensureSupabaseConfigured()
 
+  const cleanPayload = sanitizeFinancePayload(payload)
   const { data, error } = await supabase
     .from('finance_transactions')
-    .insert(sanitizeFinancePayload(payload))
+    .insert(cleanPayload)
     .select(financeFields)
     .single()
 
@@ -132,24 +260,43 @@ export async function createFinanceTransaction(payload) {
     throw normalizeFinanceError(error)
   }
 
-  return normalizeFinanceTransaction(data)
+  try {
+    await replaceFinancePayments(data.id, payload.payments)
+  } catch (paymentError) {
+    await supabase.from('finance_transactions').delete().eq('id', data.id)
+    throw paymentError
+  }
+
+  return fetchFinanceTransactionById(data.id)
 }
 
-export async function updateFinanceTransaction(id, payload) {
+export async function updateFinanceTransaction(id, payload, previousTransaction = null) {
   ensureSupabaseConfigured()
 
-  const { data, error } = await supabase
+  const previousState = previousTransaction ?? (await fetchFinanceTransactionById(id))
+  const cleanPayload = sanitizeFinancePayload(payload)
+
+  try {
+    await replaceFinancePayments(id, payload.payments)
+  } catch (paymentError) {
+    throw paymentError
+  }
+
+  const { error } = await supabase
     .from('finance_transactions')
-    .update(sanitizeFinancePayload(payload))
+    .update(cleanPayload)
     .eq('id', id)
-    .select(financeFields)
-    .single()
 
   if (error) {
+    try {
+      await replaceFinancePayments(id, previousState.payments)
+    } catch {
+      // Best effort restore if the base update fails after replacing payments.
+    }
     throw normalizeFinanceError(error)
   }
 
-  return data
+  return fetchFinanceTransactionById(id)
 }
 
 export async function deleteFinanceTransaction(id) {
@@ -161,3 +308,5 @@ export async function deleteFinanceTransaction(id) {
     throw normalizeFinanceError(error)
   }
 }
+
+export { derivePaymentSummary, buildPaymentMethodsLabel }

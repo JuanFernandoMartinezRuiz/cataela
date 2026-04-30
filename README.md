@@ -65,6 +65,7 @@ Ese archivo crea:
 - `raffle_numbers`
 - `raffle_images`
 - `finance_transactions`
+- `finance_payments`
 - `finance_categories`
 
 Para el ajuste visual de la foto principal del catalogo, `products` tambien debe tener:
@@ -84,12 +85,30 @@ alter table public.products add column if not exists image_zoom numeric not null
 Para vincular ingresos con productos del catalogo, `finance_transactions` tambien debe tener:
 
 - `product_id uuid references public.products(id) on delete set null`
+- `quantity integer`
 
 Si tu tabla `finance_transactions` ya existia antes, ejecuta tambien:
 
 ```sql
 alter table public.finance_transactions
   add column if not exists product_id uuid references public.products(id) on delete set null;
+
+alter table public.finance_transactions
+  add column if not exists quantity integer;
+```
+
+Para pagos multiples, crea tambien la tabla `finance_payments`:
+
+```sql
+create table if not exists public.finance_payments (
+  id uuid primary key default gen_random_uuid(),
+  transaction_id uuid not null references public.finance_transactions(id) on delete cascade,
+  payment_method text not null,
+  amount numeric not null default 0,
+  payment_date date not null,
+  note text,
+  created_at timestamptz not null default now()
+);
 ```
 
 Tambien agrega:

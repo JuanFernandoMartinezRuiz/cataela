@@ -120,7 +120,11 @@ export default function AdminFinancePage() {
 
     try {
       if (selectedTransaction) {
-        const updated = await updateFinanceTransaction(selectedTransaction.id, payload)
+        const updated = await updateFinanceTransaction(
+          selectedTransaction.id,
+          payload,
+          selectedTransaction,
+        )
         setTransactions((current) =>
           sortTransactions(
             current.map((transaction) =>
@@ -206,15 +210,13 @@ export default function AdminFinancePage() {
 
       const updated = await updateFinanceTransaction(transaction.id, {
         amount: Number(transaction.amount || 0),
-        paid_amount: Number(transaction.amount || 0),
         product_id: transaction.product_id || null,
         type: transaction.type,
         description: transaction.description,
         category: transaction.category,
-        payment_method: transaction.payment_method || '',
         transaction_date: transaction.transaction_date,
-        status: 'completed',
-      })
+        payments: buildPaidPayments(transaction),
+      }, transaction)
 
       setTransactions((current) =>
         sortTransactions(
@@ -750,6 +752,47 @@ function shouldShowProductMeta(transaction) {
   return !trimmedDescription.includes(transaction.product.name.toLowerCase())
 }
 
+function buildPaidPayments(transaction) {
+  const mappedPayments = (transaction.payments ?? []).map((payment) => ({
+    payment_method: payment.payment_method || '',
+    amount: Number(payment.amount || 0),
+    payment_date: payment.payment_date || transaction.transaction_date || getTodayDate(),
+    note: payment.note || '',
+  }))
+  const existingPayments =
+    mappedPayments.length || Number(transaction.paid_amount || 0) <= 0
+      ? mappedPayments
+      : [
+          {
+            payment_method: transaction.payment_method || 'Pago registrado',
+            amount: Number(transaction.paid_amount || 0),
+            payment_date: transaction.transaction_date || getTodayDate(),
+            note: 'Pago migrado desde un registro anterior.',
+          },
+        ]
+
+  const currentPaidAmount = existingPayments.reduce(
+    (sum, payment) => sum + Number(payment.amount || 0),
+    0,
+  )
+  const remainingAmount = Math.max(0, Number(transaction.amount || 0) - currentPaidAmount)
+
+  if (remainingAmount <= 0) {
+    return existingPayments
+  }
+
+  return [
+    ...existingPayments,
+    {
+      payment_method:
+        existingPayments[0]?.payment_method || transaction.payment_method || 'Pago completado',
+      amount: remainingAmount,
+      payment_date: getTodayDate(),
+      note: 'Pago completado desde el panel.',
+    },
+  ]
+}
+
 function filterTransactions(transactions, typeFilter, statusFilter) {
   return transactions.filter((transaction) => {
     const matchesType = typeFilter === 'all' ? true : transaction.type === typeFilter
@@ -995,5 +1038,9 @@ function applyCurrencyFormatByHeader(sheet, headers) {
 }
 
 function getTodayFileStamp() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function getTodayDate() {
   return new Date().toISOString().slice(0, 10)
 }
