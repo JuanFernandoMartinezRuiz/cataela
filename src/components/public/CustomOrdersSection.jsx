@@ -35,20 +35,14 @@ export default function CustomOrdersSection() {
     [availableScents],
   )
 
-  const cards = useMemo(
-    () => [
-      {
-        title: 'Esencias disponibles',
-        content: scentNames.length
-          ? scentNames.join(', ')
-          : 'Proximamente nuevos aromas disponibles.',
-      },
-      ...detailOptions.map((option) => ({
-        title: option,
-        content: option,
-      })),
-    ],
-    [scentNames],
+  const scentDescriptions = useMemo(
+    () =>
+      availableScents
+        .map((scent) => String(scent.description || '').trim())
+        .filter(Boolean)
+        .slice(0, 2)
+        .join(' · '),
+    [availableScents],
   )
 
   return (
@@ -61,20 +55,45 @@ export default function CustomOrdersSection() {
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {cards.map((card, index) => (
+          <div className="card-dashed-blue p-5 sm:col-span-2">
+            <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
+              Aromas disponibles
+            </p>
+
+            {scentNames.length ? (
+              <>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {scentNames.map((scent) => (
+                    <span
+                      key={scent}
+                      className="rounded-full border border-dashed border-mistDeep/35 bg-white/70 px-3 py-1.5 text-sm font-medium text-slate-600"
+                    >
+                      {scent}
+                    </span>
+                  ))}
+                </div>
+
+                {scentDescriptions ? (
+                  <p className="mt-4 text-sm leading-6 text-slate-500">{scentDescriptions}</p>
+                ) : null}
+              </>
+            ) : (
+              <p className="mt-3 font-display text-2xl leading-snug text-slate-700">
+                Proximamente nuevos aromas disponibles.
+              </p>
+            )}
+          </div>
+
+          {detailOptions.map((option, index) => (
             <div
-              key={card.title}
+              key={option}
               className={`p-5 ${
-                index % 3 === 0
-                  ? 'card-dashed-blue'
-                  : index % 3 === 1
-                    ? 'card-dashed-green'
-                    : 'card-dashed-rose'
+                index % 2 === 0 ? 'card-dashed-green' : 'card-dashed-rose'
               }`}
             >
-              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{card.title}</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{option}</p>
               <p className="mt-3 font-display text-2xl leading-snug text-slate-700">
-                {card.content}
+                {option}
               </p>
             </div>
           ))}
