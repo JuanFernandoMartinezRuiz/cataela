@@ -164,8 +164,8 @@ function LegendItem({ label, tone }) {
 }
 
 const stateStyles = {
-  available: 'bg-mist/16 text-slate-700 border-mist/55',
-  reserved: 'bg-sun/78 text-slate-700 border-sunDeep/80',
+  available: 'bg-slate-100 text-slate-600 border-slate-200',
+  reserved: 'bg-[#FFF6D6] text-[#8A6D1D] border-[#E6C96B]',
   paid: 'bg-sage text-slate-700 border-sageDeep/80',
   winner: 'bg-rose/62 text-slate-700 border-roseDeep/80 ring-2 ring-white/80',
 }

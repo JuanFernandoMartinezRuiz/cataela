@@ -1215,10 +1215,11 @@ function getFieldInputClassName(hasError) {
 }
 
 const stateStyles = {
-  available: 'bg-mist/16 text-slate-700 border-mist/55',
-  reserved: 'bg-sun/78 text-slate-700 border-sunDeep/80',
-  paid: 'bg-sage text-slate-700 border-sageDeep/80',
-  winner: 'bg-rose/62 text-slate-700 border-roseDeep/80 ring-2 ring-white/80',
+  available: 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200/80',
+  reserved:
+    'bg-[#FFF6D6] text-[#8A6D1D] border-[#E6C96B] hover:bg-[#FCEEB2] hover:border-[#D5B85A]',
+  paid: 'bg-sage text-slate-700 border-sageDeep/80 hover:bg-sageDeep/30',
+  winner: 'bg-rose/62 text-slate-700 border-roseDeep/80 ring-2 ring-white/80 hover:bg-rose/75',
 }
 
 function resetPreviewUrls(previews) {
