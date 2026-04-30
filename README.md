@@ -22,6 +22,7 @@ Web dinamica hecha con React + Vite + Tailwind para el emprendimiento Cataela, c
 - `/admin/productos` lista de productos
 - `/admin/productos/nuevo` crear producto
 - `/admin/productos/:id` editar producto
+- `/admin/pedidos` calendario y gestion de pedidos
 - `/admin/finanzas` gestion financiera
 - `/admin/rifas` gestion de rifas
 
@@ -64,6 +65,8 @@ Ese archivo crea:
 - `raffles`
 - `raffle_numbers`
 - `raffle_images`
+- `orders`
+- `order_items`
 - `finance_transactions`
 - `finance_payments`
 - `finance_transaction_items`
@@ -146,6 +149,36 @@ create table if not exists public.finance_transaction_items (
 );
 ```
 
+Para organizar entregas futuras, crea tambien las tablas `orders` y `order_items`:
+
+```sql
+create table if not exists public.orders (
+  id uuid primary key default gen_random_uuid(),
+  customer_name text not null,
+  customer_phone text,
+  delivery_date date not null,
+  delivery_time time,
+  delivery_address text,
+  status text not null default 'pending',
+  payment_status text not null default 'pending',
+  total_amount numeric not null default 0,
+  paid_amount numeric not null default 0,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.order_items (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  product_id uuid references public.products(id) on delete set null,
+  product_name text not null,
+  unit_price numeric not null default 0,
+  quantity integer not null default 1,
+  subtotal numeric generated always as (unit_price * quantity) stored,
+  custom_description text
+);
+```
+
 Tambien agrega:
 
 - `uuid` por defecto con `gen_random_uuid()`
@@ -191,6 +224,7 @@ Puedes adaptar las politicas segun tus roles reales de administracion.
 - `src/services/imageService.js`: subidas y borrado de imagenes en Storage
 - `src/services/raffleService.js`: CRUD de rifas y numeros
 - `src/services/imageService.js`: tambien gestiona imagenes de rifas y sorteos
+- `src/services/orderService.js`: CRUD de pedidos y calendario interno
 - `src/services/financeService.js`: CRUD de ingresos, egresos y pendientes
 - `src/services/authService.js`: login, sesion y logout
 

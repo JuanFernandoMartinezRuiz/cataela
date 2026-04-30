@@ -75,6 +75,32 @@ create table if not exists public.raffle_images (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.orders (
+  id uuid primary key default gen_random_uuid(),
+  customer_name text not null,
+  customer_phone text,
+  delivery_date date not null,
+  delivery_time time,
+  delivery_address text,
+  status text not null default 'pending' check (status in ('pending', 'preparing', 'ready', 'delivered', 'cancelled')),
+  payment_status text not null default 'pending' check (payment_status in ('pending', 'partial', 'paid')),
+  total_amount numeric not null default 0,
+  paid_amount numeric not null default 0,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.order_items (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  product_id uuid references public.products(id) on delete set null,
+  product_name text not null,
+  unit_price numeric not null default 0,
+  quantity integer not null default 1,
+  subtotal numeric generated always as (unit_price * quantity) stored,
+  custom_description text
+);
+
 create table if not exists public.finance_transactions (
   id uuid primary key default gen_random_uuid(),
   type text not null check (type in ('income', 'expense')),

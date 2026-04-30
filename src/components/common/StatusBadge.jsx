@@ -10,6 +10,10 @@ const colorMap = {
   completed: 'border border-sageDeep/80 bg-sage text-slate-700',
   pending: 'border border-sunDeep/90 bg-sun/72 text-slate-700',
   partial: 'border border-sand/60 bg-petal text-slate-700',
+  preparing: 'border border-mistDeep/70 bg-mist/18 text-slate-700',
+  ready: 'border border-roseDeep/80 bg-rose/60 text-slate-700',
+  delivered: 'border border-sageDeep/80 bg-sage text-slate-700',
+  cancelled: 'border border-dangerDeep/80 bg-danger/45 text-slate-700',
 }
 
 export default function StatusBadge({ children, tone = 'inactive' }) {

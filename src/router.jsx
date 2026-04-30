@@ -6,6 +6,7 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage'
 import AdminFinancePage from './pages/admin/AdminFinancePage'
 import AdminLoginPage from './pages/admin/AdminLoginPage'
+import AdminOrdersPage from './pages/admin/AdminOrdersPage'
 import AdminProductFormPage from './pages/admin/AdminProductFormPage'
 import AdminProductsPage from './pages/admin/AdminProductsPage'
 import AdminRafflesPage from './pages/admin/AdminRafflesPage'
@@ -39,6 +40,7 @@ export const appRouter = createBrowserRouter([
       { index: true, element: <AdminDashboardPage /> },
       { path: 'productos', element: <AdminProductsPage /> },
       { path: 'categorias', element: <AdminCategoriesPage /> },
+      { path: 'pedidos', element: <AdminOrdersPage /> },
       { path: 'finanzas', element: <AdminFinancePage /> },
       { path: 'productos/nuevo', element: <AdminProductFormPage /> },
       { path: 'productos/:id', element: <AdminProductFormPage /> },
