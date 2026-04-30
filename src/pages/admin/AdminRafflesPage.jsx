@@ -881,19 +881,31 @@ export default function AdminRafflesPage() {
                       value={winnerNumber?.number || 'Sin ganador'}
                     />
                     <WideSummaryCard label="Finanzas de la rifa">
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <FinanceMiniStat
-                          label="Ingreso pagado"
-                          value={formatCurrency(summary.paidRevenue)}
-                        />
-                        <FinanceMiniStat
-                          label="Ingreso pendiente"
-                          value={formatCurrency(summary.pendingRevenue)}
-                        />
-                        <FinanceMiniStat
-                          label="Ingreso total esperado"
-                          value={formatCurrency(summary.potentialRevenue)}
-                        />
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-4">
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                            Ingreso pagado
+                          </p>
+                          <p className="text-base whitespace-nowrap text-slate-700">
+                            {formatCurrency(summary.paidRevenue)}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                            Ingreso pendiente
+                          </p>
+                          <p className="text-base whitespace-nowrap text-slate-700">
+                            {formatCurrency(summary.pendingRevenue)}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                            Ingreso esperado
+                          </p>
+                          <p className="text-base whitespace-nowrap text-slate-700">
+                            {formatCurrency(summary.potentialRevenue)}
+                          </p>
+                        </div>
                       </div>
                     </WideSummaryCard>
                   </div>
@@ -1158,17 +1170,6 @@ function WideSummaryCard({ label, value, children }) {
           {value}
         </p>
       )}
-    </div>
-  )
-}
-
-function FinanceMiniStat({ label, value }) {
-  return (
-    <div className="rounded-[1.2rem] border border-dashed border-mist/60 bg-cream/45 p-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{label}</p>
-      <p className="mt-3 break-words text-base font-semibold leading-tight text-slate-700">
-        {value}
-      </p>
     </div>
   )
 }
