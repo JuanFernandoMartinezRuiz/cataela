@@ -41,6 +41,17 @@ const statusFilters = [
   { value: 'partial', label: 'Parciales' },
 ]
 
+const tableSortOptions = [
+  { value: 'date_desc', label: 'Fecha mas reciente' },
+  { value: 'date_asc', label: 'Fecha mas antigua' },
+  { value: 'amount_desc', label: 'Mayor total' },
+  { value: 'amount_asc', label: 'Menor total' },
+  { value: 'paid_desc', label: 'Mayor pagado' },
+  { value: 'remaining_desc', label: 'Mayor pendiente' },
+  { value: 'category_asc', label: 'Categoria A-Z' },
+  { value: 'status_asc', label: 'Estado' },
+]
+
 const paymentMethodOrder = ['Efectivo', 'Nequi', 'Daviplata', 'Transferencia', 'Otro']
 
 export default function AdminFinancePage() {
@@ -52,6 +63,8 @@ export default function AdminFinancePage() {
   const [rangeType, setRangeType] = useState('month')
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [tableSort, setTableSort] = useState('date_desc')
   const [customRange, setCustomRange] = useState({
     startDate: '',
     endDate: '',
@@ -299,6 +312,21 @@ export default function AdminFinancePage() {
     [transactions, typeFilter, statusFilter],
   )
 
+  const categoryOptions = useMemo(
+    () => buildFinanceCategoryOptions(financeCategories, filteredTransactions),
+    [financeCategories, filteredTransactions],
+  )
+
+  const tableTransactions = useMemo(
+    () =>
+      sortFinanceTableTransactions(
+        filterTransactions(filteredTransactions, 'all', 'all', categoryFilter),
+        tableSort,
+        activeRange,
+      ),
+    [filteredTransactions, categoryFilter, tableSort, activeRange],
+  )
+
   const summary = useMemo(
     () => buildFinanceSummary(filteredTransactions, activeRange),
     [filteredTransactions, activeRange],
@@ -321,6 +349,13 @@ export default function AdminFinancePage() {
       'Todos los estados'
     return `${typeLabel}, ${statusLabel}`
   }, [typeFilter, statusFilter])
+
+  function handleClearTableFilters() {
+    setTypeFilter('all')
+    setStatusFilter('all')
+    setCategoryFilter('all')
+    setTableSort('date_desc')
+  }
 
   async function handleExportExcel() {
     if (!filteredTransactions.length) {
@@ -640,17 +675,87 @@ export default function AdminFinancePage() {
       {!loading && !error ? (
         <div className="admin-panel overflow-hidden">
           <div className="border-b border-sand/30 px-6 py-5">
-            <h2 className="font-display text-3xl text-slate-700">Movimientos</h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Registros guardados en Supabase dentro del rango y filtros actuales.
-            </p>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h2 className="font-display text-3xl text-slate-700">Movimientos</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Registros guardados en Supabase dentro del rango y filtros actuales.
+                </p>
+              </div>
+              <button type="button" onClick={handleClearTableFilters} className="btn-secondary">
+                Limpiar filtros
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div>
+                <label className="field-label">Tipo</label>
+                <select
+                  value={typeFilter}
+                  onChange={(event) => setTypeFilter(event.target.value)}
+                  className="field-input w-full"
+                >
+                  {typeFilters.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="field-label">Estado</label>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                  className="field-input w-full"
+                >
+                  {statusFilters.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="field-label">Categoria</label>
+                <select
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  className="field-input w-full"
+                >
+                  <option value="all">Todas</option>
+                  {categoryOptions.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="field-label">Ordenar por</label>
+                <select
+                  value={tableSort}
+                  onChange={(event) => setTableSort(event.target.value)}
+                  className="field-input w-full"
+                >
+                  {tableSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
-          {!filteredTransactions.length ? (
+          {!tableTransactions.length ? (
             <div className="p-6">
               <EmptyState
-                title="No hay movimientos para este filtro"
-                description="Prueba otro rango o cambia el filtro de tipo y estado para ver resultados."
+                title="No hay movimientos con estos filtros."
+                description="Prueba otra categoria, cambia el orden o limpia los filtros para ver resultados."
               />
             </div>
           ) : (
@@ -674,7 +779,7 @@ export default function AdminFinancePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.map((transaction) => (
+                  {tableTransactions.map((transaction) => (
                     <tr key={transaction.id} className="border-t border-sand/30 align-top">
                       <td className="px-6 py-4">{formatDate(transaction.transaction_date)}</td>
                       <td className="px-6 py-4">
@@ -943,12 +1048,95 @@ function buildPaidPayments(transaction) {
   ]
 }
 
-function filterTransactions(transactions, typeFilter, statusFilter) {
+function filterTransactions(transactions, typeFilter, statusFilter, categoryFilter = 'all') {
   return transactions.filter((transaction) => {
     const matchesType = typeFilter === 'all' ? true : transaction.type === typeFilter
     const matchesStatus = statusFilter === 'all' ? true : transaction.status === statusFilter
-    return matchesType && matchesStatus
+    const matchesCategory =
+      categoryFilter === 'all'
+        ? true
+        : String(transaction.category || 'Sin categoria') === categoryFilter
+    return matchesType && matchesStatus && matchesCategory
   })
+}
+
+function buildFinanceCategoryOptions(financeCategories, transactions) {
+  const names = new Set()
+
+  ;(financeCategories ?? []).forEach((category) => {
+    if (category?.name) {
+      names.add(category.name)
+    }
+  })
+
+  ;(transactions ?? []).forEach((transaction) => {
+    if (transaction?.category) {
+      names.add(transaction.category)
+    }
+  })
+
+  return Array.from(names).sort((left, right) =>
+    left.localeCompare(right, 'es', { sensitivity: 'base' }),
+  )
+}
+
+function sortFinanceTableTransactions(transactions, sortKey, activeRange) {
+  const statusOrder = {
+    completed: 0,
+    partial: 1,
+    pending: 2,
+  }
+
+  return [...transactions].sort((left, right) => {
+    if (sortKey === 'date_asc') {
+      return compareTransactionDate(left, right)
+    }
+
+    if (sortKey === 'amount_desc') {
+      return Number(right.amount || 0) - Number(left.amount || 0)
+    }
+
+    if (sortKey === 'amount_asc') {
+      return Number(left.amount || 0) - Number(right.amount || 0)
+    }
+
+    if (sortKey === 'paid_desc') {
+      return (
+        getEffectivePaidAmount(right, activeRange) - getEffectivePaidAmount(left, activeRange)
+      )
+    }
+
+    if (sortKey === 'remaining_desc') {
+      return (
+        getEffectiveRemainingAmount(right, activeRange) -
+        getEffectiveRemainingAmount(left, activeRange)
+      )
+    }
+
+    if (sortKey === 'category_asc') {
+      return String(left.category || 'Sin categoria').localeCompare(
+        String(right.category || 'Sin categoria'),
+        'es',
+        { sensitivity: 'base' },
+      )
+    }
+
+    if (sortKey === 'status_asc') {
+      const leftStatus = statusOrder[left.status] ?? 99
+      const rightStatus = statusOrder[right.status] ?? 99
+      if (leftStatus !== rightStatus) {
+        return leftStatus - rightStatus
+      }
+    }
+
+    return compareTransactionDate(right, left)
+  })
+}
+
+function compareTransactionDate(left, right) {
+  const leftKey = `${left.transaction_date || ''}-${left.created_at || ''}`
+  const rightKey = `${right.transaction_date || ''}-${right.created_at || ''}`
+  return leftKey.localeCompare(rightKey)
 }
 
 function buildFinanceSummary(transactions, activeRange) {
