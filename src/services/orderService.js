@@ -11,6 +11,7 @@ const orderFields = `
   payment_status,
   total_amount,
   paid_amount,
+  selected_scents,
   notes,
   created_at,
   order_items (
@@ -66,6 +67,7 @@ function normalizeOrder(order) {
     ...order,
     items,
     itemsSummary: buildOrderItemsSummary(items),
+    selected_scents: Array.isArray(order.selected_scents) ? order.selected_scents : [],
   }
 }
 
@@ -153,6 +155,7 @@ function sanitizeOrderPayload(payload, itemRows) {
     payment_status: paymentStatus,
     total_amount: totalAmount,
     paid_amount: paidAmount,
+    selected_scents: Array.isArray(payload.selected_scents) ? payload.selected_scents : [],
     notes: String(payload.notes || '').trim() || null,
   }
 }

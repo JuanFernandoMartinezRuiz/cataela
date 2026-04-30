@@ -7,6 +7,7 @@ import LoadingState from '../../components/common/LoadingState'
 import PageHeading from '../../components/common/PageHeading'
 import StatusBadge from '../../components/common/StatusBadge'
 import { useToast } from '../../providers/ToastProvider'
+import { fetchAvailableEssences } from '../../services/essenceService'
 import { fetchActiveProductOptions } from '../../services/productService'
 import { createOrder, deleteOrder, fetchOrders, updateOrder } from '../../services/orderService'
 import { formatCurrency, formatDate } from '../../utils/formatters'
@@ -17,6 +18,7 @@ export default function AdminOrdersPage() {
   const { showToast } = useToast()
   const [orders, setOrders] = useState([])
   const [products, setProducts] = useState([])
+  const [scents, setScents] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [selectedDate, setSelectedDate] = useState(getTodayDate())
   const [monthCursor, setMonthCursor] = useState(getMonthStart(new Date()))
@@ -34,12 +36,14 @@ export default function AdminOrdersPage() {
     try {
       setLoading(true)
       setError('')
-      const [orderRows, productRows] = await Promise.all([
+      const [orderRows, productRows, scentRows] = await Promise.all([
         fetchOrders(),
         fetchActiveProductOptions(),
+        fetchAvailableEssences().catch(() => []),
       ])
       setOrders(sortOrders(orderRows))
       setProducts(productRows)
+      setScents(scentRows)
     } catch (loadError) {
       setError(loadError.message || 'No fue posible cargar los pedidos.')
     } finally {
@@ -168,6 +172,7 @@ export default function AdminOrdersPage() {
           <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
             <OrderForm
               products={products}
+              scents={scents}
               selectedOrder={selectedOrder}
               saving={saving}
               saveLabel={saveLabel}
@@ -381,6 +386,19 @@ function OrderCard({ order, deleting, onEdit, onDelete }) {
         </p>
       </div>
 
+      {order.selected_scents?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {order.selected_scents.map((scent) => (
+            <span
+              key={`${order.id}-${scent}`}
+              className="rounded-full border border-dashed border-blush/60 bg-blush/12 px-3 py-1 text-xs font-medium text-slate-600"
+            >
+              {scent}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
       {order.notes ? (
         <p className="mt-3 text-sm italic text-slate-400" title={order.notes}>
           {order.notes}
@@ -564,7 +582,12 @@ function buildOrderWhatsAppLink(order) {
   const productLines = (order.items ?? [])
     .map((item) => `- ${item.product_name} x ${item.quantity}`)
     .join('\n')
-  const message = productLines ? `${intro}\n\n${productLines}` : intro
+  const scentsLine = order.selected_scents?.length
+    ? `\n\nEsencias: ${order.selected_scents.join(', ')}`
+    : ''
+  const message = productLines
+    ? `${intro}\n\n${productLines}${scentsLine}`
+    : `${intro}${scentsLine}`
 
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
 }

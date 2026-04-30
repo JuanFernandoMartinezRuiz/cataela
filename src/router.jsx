@@ -4,6 +4,7 @@ import AdminLayout from './layouts/AdminLayout'
 import PublicLayout from './layouts/PublicLayout'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage'
+import AdminEssencesPage from './pages/admin/AdminEssencesPage'
 import AdminFinancePage from './pages/admin/AdminFinancePage'
 import AdminLoginPage from './pages/admin/AdminLoginPage'
 import AdminOrdersPage from './pages/admin/AdminOrdersPage'
@@ -40,6 +41,7 @@ export const appRouter = createBrowserRouter([
       { index: true, element: <AdminDashboardPage /> },
       { path: 'productos', element: <AdminProductsPage /> },
       { path: 'categorias', element: <AdminCategoriesPage /> },
+      { path: 'esencias', element: <AdminEssencesPage /> },
       { path: 'pedidos', element: <AdminOrdersPage /> },
       { path: 'finanzas', element: <AdminFinancePage /> },
       { path: 'productos/nuevo', element: <AdminProductFormPage /> },

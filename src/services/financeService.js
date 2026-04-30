@@ -9,6 +9,7 @@ const financeFields = `
   product_id,
   quantity,
   buyer_name,
+  selected_scents,
   description,
   category,
   payment_method,
@@ -99,6 +100,7 @@ function normalizeFinanceTransaction(transaction) {
     itemsSummary: buildTransactionItemsSummary(items),
     payments,
     payment_method: methodsLabel || transaction.payment_method || '',
+    selected_scents: Array.isArray(transaction.selected_scents) ? transaction.selected_scents : [],
   }
 }
 
@@ -139,6 +141,7 @@ function sanitizeFinancePayload(payload) {
     product_id: primaryItem?.product_id || payload.product_id || null,
     quantity: primaryItem?.quantity || payload.quantity || null,
     buyer_name: payload.buyer_name || null,
+    selected_scents: Array.isArray(payload.selected_scents) ? payload.selected_scents : [],
     type: payload.type,
     description: payload.description,
     category: payload.category,

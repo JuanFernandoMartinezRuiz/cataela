@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import FinanceCategoryModal from './FinanceCategoryModal'
+import ScentsSelector from './ScentsSelector'
 import StatusBadge from '../common/StatusBadge'
 import { useToast } from '../../providers/ToastProvider'
 import { deriveItemsSummary, derivePaymentSummary } from '../../services/financeService'
@@ -11,6 +12,7 @@ const initialState = {
   type: 'income',
   amount: '',
   buyer_name: '',
+  selected_scents: [],
   description: '',
   category: '',
   transaction_date: '',
@@ -37,6 +39,7 @@ const emptySaleItem = () => ({
 export default function FinanceForm({
   financeCategories,
   products = [],
+  scents = [],
   selectedTransaction,
   saving,
   saveLabel,
@@ -68,6 +71,9 @@ export default function FinanceForm({
       type: selectedTransaction.type,
       amount: selectedTransaction.amount ?? '',
       buyer_name: selectedTransaction.buyer_name || '',
+      selected_scents: Array.isArray(selectedTransaction.selected_scents)
+        ? selectedTransaction.selected_scents
+        : [],
       description: selectedTransaction.description || '',
       category: selectedTransaction.category || '',
       transaction_date: selectedTransaction.transaction_date || getTodayDate(),
@@ -86,6 +92,7 @@ export default function FinanceForm({
 
   const isSalesCategory =
     formValues.type === 'income' && formValues.category === 'Ventas'
+  const shouldShowScents = formValues.type === 'income' && formValues.category === 'Ventas'
   const shouldShowBuyerName =
     formValues.type === 'income' &&
     (formValues.category === 'Ventas' || formValues.category === 'Rifas')
@@ -196,6 +203,7 @@ export default function FinanceForm({
       type: nextType,
       category: '',
       buyer_name: '',
+      selected_scents: [],
       items: [],
     }))
     setFieldErrors((current) => {
@@ -215,6 +223,8 @@ export default function FinanceForm({
         current.type === 'income' && (nextCategory === 'Ventas' || nextCategory === 'Rifas')
           ? current.buyer_name
           : '',
+      selected_scents:
+        current.type === 'income' && nextCategory === 'Ventas' ? current.selected_scents : [],
       items:
         nextCategory === 'Ventas' && current.type === 'income'
           ? current.items
@@ -222,6 +232,7 @@ export default function FinanceForm({
     }))
     clearFieldError('category')
     clearFieldError('buyer_name')
+    clearFieldError('selected_scents')
     clearFieldError('items')
   }
 
@@ -455,6 +466,7 @@ export default function FinanceForm({
         ...formValues,
         amount,
         buyer_name: shouldShowBuyerName ? formValues.buyer_name.trim() : null,
+        selected_scents: shouldShowScents ? formValues.selected_scents : [],
         items: isSalesCategory ? cleanItems : [],
         payments: cleanPayments,
         description: formValues.description.trim(),
@@ -571,6 +583,18 @@ export default function FinanceForm({
                 placeholder="Ej: Juan Perez"
               />
             </Field>
+          ) : null}
+
+          {shouldShowScents ? (
+            <div className="md:col-span-2">
+              <ScentsSelector
+                label="Esencias elegidas"
+                scents={scents}
+                selectedValues={formValues.selected_scents}
+                onChange={(nextValues) => updateValue('selected_scents', nextValues)}
+                emptyMessage="No hay esencias disponibles por ahora."
+              />
+            </div>
           ) : null}
 
           <Field label="Fecha" error={fieldErrors.transaction_date} required>

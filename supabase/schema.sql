@@ -75,6 +75,15 @@ create table if not exists public.raffle_images (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.essences (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text,
+  is_available boolean not null default true,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   customer_name text not null,
@@ -86,6 +95,7 @@ create table if not exists public.orders (
   payment_status text not null default 'pending' check (payment_status in ('pending', 'partial', 'paid')),
   total_amount numeric not null default 0,
   paid_amount numeric not null default 0,
+  selected_scents text[] not null default '{}'::text[],
   notes text,
   created_at timestamptz not null default now()
 );
@@ -110,6 +120,7 @@ create table if not exists public.finance_transactions (
   product_id uuid references public.products(id) on delete set null,
   quantity integer,
   buyer_name text,
+  selected_scents text[] not null default '{}'::text[],
   description text not null,
   category text,
   payment_method text,
@@ -126,6 +137,12 @@ alter table public.finance_transactions
 
 alter table public.finance_transactions
   add column if not exists buyer_name text;
+
+alter table public.finance_transactions
+  add column if not exists selected_scents text[] not null default '{}'::text[];
+
+alter table public.orders
+  add column if not exists selected_scents text[] not null default '{}'::text[];
 
 alter table public.raffle_numbers
   add column if not exists finance_transaction_id uuid references public.finance_transactions(id) on delete set null;

@@ -22,6 +22,7 @@ Web dinamica hecha con React + Vite + Tailwind para el emprendimiento Cataela, c
 - `/admin/productos` lista de productos
 - `/admin/productos/nuevo` crear producto
 - `/admin/productos/:id` editar producto
+- `/admin/esencias` gestion de aromas disponibles
 - `/admin/pedidos` calendario y gestion de pedidos
 - `/admin/finanzas` gestion financiera
 - `/admin/rifas` gestion de rifas
@@ -65,6 +66,7 @@ Ese archivo crea:
 - `raffles`
 - `raffle_numbers`
 - `raffle_images`
+- `essences`
 - `orders`
 - `order_items`
 - `finance_transactions`
@@ -91,6 +93,7 @@ Para vincular ingresos con productos del catalogo, `finance_transactions` tambie
 - `product_id uuid references public.products(id) on delete set null`
 - `quantity integer`
 - `buyer_name text`
+- `selected_scents text[] not null default '{}'::text[]`
 
 Si tu tabla `finance_transactions` ya existia antes, ejecuta tambien:
 
@@ -103,6 +106,20 @@ alter table public.finance_transactions
 
 alter table public.finance_transactions
   add column if not exists buyer_name text;
+
+alter table public.finance_transactions
+  add column if not exists selected_scents text[] not null default '{}'::text[];
+```
+
+Para pedidos futuros, `orders` tambien debe tener:
+
+- `selected_scents text[] not null default '{}'::text[]`
+
+Si tu tabla `orders` ya existia antes, ejecuta tambien:
+
+```sql
+alter table public.orders
+  add column if not exists selected_scents text[] not null default '{}'::text[];
 ```
 
 Para pagos multiples, crea tambien la tabla `finance_payments`:
@@ -179,6 +196,19 @@ create table if not exists public.order_items (
 );
 ```
 
+Para gestionar aromas en todo el panel, crea tambien la tabla `essences`:
+
+```sql
+create table if not exists public.essences (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text,
+  is_available boolean not null default true,
+  notes text,
+  created_at timestamptz not null default now()
+);
+```
+
 Tambien agrega:
 
 - `uuid` por defecto con `gen_random_uuid()`
@@ -225,6 +255,7 @@ Puedes adaptar las politicas segun tus roles reales de administracion.
 - `src/services/raffleService.js`: CRUD de rifas y numeros
 - `src/services/imageService.js`: tambien gestiona imagenes de rifas y sorteos
 - `src/services/orderService.js`: CRUD de pedidos y calendario interno
+- `src/services/essenceService.js`: CRUD de esencias y disponibilidad de aromas
 - `src/services/financeService.js`: CRUD de ingresos, egresos y pendientes
 - `src/services/authService.js`: login, sesion y logout
 

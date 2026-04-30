@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import ScentsSelector from './ScentsSelector'
 import { formatCurrency } from '../../utils/formatters'
 
 const orderStatusOptions = [
@@ -24,6 +25,7 @@ const initialState = {
   status: 'pending',
   payment_status: 'pending',
   paid_amount: '',
+  selected_scents: [],
   notes: '',
   items: [],
 }
@@ -41,6 +43,7 @@ function createEmptyItem() {
 
 export default function OrderForm({
   products = [],
+  scents = [],
   selectedOrder,
   saving,
   saveLabel,
@@ -71,6 +74,9 @@ export default function OrderForm({
       status: selectedOrder.status || 'pending',
       payment_status: selectedOrder.payment_status || 'pending',
       paid_amount: selectedOrder.paid_amount ?? '',
+      selected_scents: Array.isArray(selectedOrder.selected_scents)
+        ? selectedOrder.selected_scents
+        : [],
       notes: selectedOrder.notes || '',
       items: buildInitialItems(selectedOrder),
     })
@@ -287,6 +293,7 @@ export default function OrderForm({
         notes: formValues.notes.trim(),
         payment_status: normalizedPaymentStatus,
         paid_amount: paidAmount,
+        selected_scents: formValues.selected_scents,
         items: cleanItems.map((item) => ({
           ...item,
           product_name:
@@ -483,6 +490,25 @@ export default function OrderForm({
         )}
 
         {fieldErrors.items ? <p className="field-error mt-3">{fieldErrors.items}</p> : null}
+      </section>
+
+      <section className="mt-6 rounded-[1.8rem] border border-dashed border-mist/55 bg-white/78 p-6 md:p-7">
+        <div className="flex flex-col gap-2">
+          <h3 className="font-display text-2xl text-slate-700">Esencias solicitadas</h3>
+          <p className="text-sm text-slate-500">
+            Selecciona una o varias esencias para dejar claro el aroma pedido por el cliente.
+          </p>
+        </div>
+
+        <div className="mt-5">
+          <ScentsSelector
+            label="Esencias solicitadas"
+            scents={scents}
+            selectedValues={formValues.selected_scents}
+            onChange={(nextValues) => updateValue('selected_scents', nextValues)}
+            emptyMessage="No hay esencias disponibles por ahora."
+          />
+        </div>
       </section>
 
       <div className="mt-6 space-y-5">

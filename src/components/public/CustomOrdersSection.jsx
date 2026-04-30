@@ -1,13 +1,56 @@
+import { useEffect, useMemo, useState } from 'react'
 import PageHeading from '../common/PageHeading'
+import { fetchAvailableEssences } from '../../services/essenceService'
 
-const options = [
-  'Vainilla, Lavanda, Frutos Rojos, Fresa, Maracuya, Manzana verde en composiciones suaves.',
-  'Colores personalizados',
-  'Aromas a eleccion',
-  'Diseños especiales',
-]
+const detailOptions = ['Colores personalizados', 'Aromas a eleccion', 'Diseños especiales']
 
 export default function CustomOrdersSection() {
+  const [availableScents, setAvailableScents] = useState([])
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadScents() {
+      try {
+        const rows = await fetchAvailableEssences()
+        if (isMounted) {
+          setAvailableScents(rows)
+        }
+      } catch {
+        if (isMounted) {
+          setAvailableScents([])
+        }
+      }
+    }
+
+    loadScents()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const scentNames = useMemo(
+    () => availableScents.map((scent) => scent.name).filter(Boolean),
+    [availableScents],
+  )
+
+  const cards = useMemo(
+    () => [
+      {
+        title: 'Esencias disponibles',
+        content: scentNames.length
+          ? scentNames.join(', ')
+          : 'Proximamente nuevos aromas disponibles.',
+      },
+      ...detailOptions.map((option) => ({
+        title: option,
+        content: option,
+      })),
+    ],
+    [scentNames],
+  )
+
   return (
     <section className="page-section">
       <div className="card-soft grid gap-6 p-6 md:p-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
@@ -18,9 +61,9 @@ export default function CustomOrdersSection() {
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {options.map((option, index) => (
+          {cards.map((card, index) => (
             <div
-              key={option}
+              key={card.title}
               className={`p-5 ${
                 index % 3 === 0
                   ? 'card-dashed-blue'
@@ -29,7 +72,10 @@ export default function CustomOrdersSection() {
                     : 'card-dashed-rose'
               }`}
             >
-              <p className="font-display text-2xl text-slate-700">{option}</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{card.title}</p>
+              <p className="mt-3 font-display text-2xl leading-snug text-slate-700">
+                {card.content}
+              </p>
             </div>
           ))}
 

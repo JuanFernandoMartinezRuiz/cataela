@@ -8,6 +8,7 @@ import StatusBadge from '../../components/common/StatusBadge'
 import FinanceChart from '../../components/admin/FinanceChart'
 import FinanceForm from '../../components/admin/FinanceForm'
 import { useToast } from '../../providers/ToastProvider'
+import { fetchAvailableEssences } from '../../services/essenceService'
 import { fetchActiveProductOptions } from '../../services/productService'
 import {
   createFinanceCategory,
@@ -46,6 +47,7 @@ export default function AdminFinancePage() {
   const { showToast } = useToast()
   const [financeCategories, setFinanceCategories] = useState([])
   const [products, setProducts] = useState([])
+  const [scents, setScents] = useState([])
   const [transactions, setTransactions] = useState([])
   const [rangeType, setRangeType] = useState('month')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -72,6 +74,7 @@ export default function AdminFinancePage() {
   useEffect(() => {
     loadCategories()
     loadProducts()
+    loadScents()
   }, [])
 
   useEffect(() => {
@@ -99,6 +102,15 @@ export default function AdminFinancePage() {
           loadError.message || 'No fue posible cargar los productos activos del catalogo.',
         tone: 'error',
       })
+    }
+  }
+
+  async function loadScents() {
+    try {
+      const rows = await fetchAvailableEssences()
+      setScents(rows)
+    } catch {
+      setScents([])
     }
   }
 
@@ -336,6 +348,7 @@ export default function AdminFinancePage() {
           Fecha: transaction.transaction_date || '',
           Tipo: transaction.type === 'income' ? 'Ingreso' : 'Egreso',
           Comprador: transaction.buyer_name || '—',
+          Esencias: (transaction.selected_scents ?? []).join(', '),
           Estado: translateFinanceStatus(transaction.status),
           Producto: transaction.itemsSummary || transaction.product?.name || '',
           Categoria: transaction.category || 'Sin categoria',
@@ -489,6 +502,7 @@ export default function AdminFinancePage() {
         <FinanceForm
           financeCategories={financeCategories}
           products={products}
+          scents={scents}
           selectedTransaction={selectedTransaction}
           saving={saving}
           saveLabel={saveLabel}
@@ -684,6 +698,15 @@ export default function AdminFinancePage() {
                               style={singleLineClampStyle}
                             >
                               Comprador: {transaction.buyer_name}
+                            </p>
+                          ) : null}
+                          {transaction.selected_scents?.length ? (
+                            <p
+                              className="text-xs text-slate-400"
+                              title={transaction.selected_scents.join(', ')}
+                              style={clampToTwoLinesStyle}
+                            >
+                              Esencias: {transaction.selected_scents.join(', ')}
                             </p>
                           ) : null}
                           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
