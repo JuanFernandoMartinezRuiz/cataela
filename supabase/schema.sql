@@ -103,6 +103,16 @@ create table if not exists public.finance_payments (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.finance_transaction_items (
+  id uuid primary key default gen_random_uuid(),
+  transaction_id uuid not null references public.finance_transactions(id) on delete cascade,
+  product_id uuid not null references public.products(id) on delete restrict,
+  quantity integer not null default 1,
+  unit_price numeric not null default 0,
+  subtotal numeric generated always as (quantity * unit_price) stored,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.finance_categories (
   id uuid primary key default gen_random_uuid(),
   name text not null,

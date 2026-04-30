@@ -66,6 +66,7 @@ Ese archivo crea:
 - `raffle_images`
 - `finance_transactions`
 - `finance_payments`
+- `finance_transaction_items`
 - `finance_categories`
 
 Para el ajuste visual de la foto principal del catalogo, `products` tambien debe tener:
@@ -107,6 +108,20 @@ create table if not exists public.finance_payments (
   amount numeric not null default 0,
   payment_date date not null,
   note text,
+  created_at timestamptz not null default now()
+);
+```
+
+Para ventas con multiples productos, crea tambien la tabla `finance_transaction_items`:
+
+```sql
+create table if not exists public.finance_transaction_items (
+  id uuid primary key default gen_random_uuid(),
+  transaction_id uuid not null references public.finance_transactions(id) on delete cascade,
+  product_id uuid not null references public.products(id) on delete restrict,
+  quantity integer not null default 1,
+  unit_price numeric not null default 0,
+  subtotal numeric generated always as (quantity * unit_price) stored,
   created_at timestamptz not null default now()
 );
 ```

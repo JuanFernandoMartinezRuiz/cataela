@@ -144,8 +144,8 @@ export default function AdminFinancePage() {
       const created = await createFinanceTransaction(payload)
       setTransactions((current) => sortTransactions([created, ...current]))
       showToast({
-        title: 'Movimiento guardado',
-        description: 'El movimiento se registro correctamente.',
+        title: 'Movimiento guardado correctamente',
+        description: 'Ya puedes registrar otro movimiento.',
         tone: 'success',
       })
     } catch (submitError) {
@@ -210,11 +210,11 @@ export default function AdminFinancePage() {
 
       const updated = await updateFinanceTransaction(transaction.id, {
         amount: Number(transaction.amount || 0),
-        product_id: transaction.product_id || null,
         type: transaction.type,
         description: transaction.description,
         category: transaction.category,
         transaction_date: transaction.transaction_date,
+        items: transaction.items || [],
         payments: buildPaidPayments(transaction),
       }, transaction)
 
@@ -325,7 +325,7 @@ export default function AdminFinancePage() {
           Fecha: transaction.transaction_date || '',
           Tipo: transaction.type === 'income' ? 'Ingreso' : 'Egreso',
           Estado: translateFinanceStatus(transaction.status),
-          Producto: transaction.product?.name || '',
+          Producto: transaction.itemsSummary || transaction.product?.name || '',
           Categoria: transaction.category || 'Sin categoria',
           Descripcion: transaction.description || '',
           'Metodo de pago': transaction.payment_method || 'Sin metodo',
@@ -334,9 +334,21 @@ export default function AdminFinancePage() {
           Restante: Number(transaction.remaining_amount || 0),
         })),
       )
+      const soldItemsRows = filteredTransactions.flatMap((transaction) =>
+        (transaction.items ?? []).map((item) => ({
+          Fecha: transaction.transaction_date || '',
+          Transaccion: transaction.description || transaction.id,
+          Producto: item.product?.name || 'Producto eliminado',
+          Cantidad: Number(item.quantity || 0),
+          'Precio unitario': Number(item.unit_price || 0),
+          Subtotal: Number(item.subtotal || 0),
+        })),
+      )
+      const soldItemsSheet = XLSX.utils.json_to_sheet(soldItemsRows)
 
       applyCurrencyFormat(summarySheet, ['B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11'])
       applyCurrencyFormatByHeader(movementsSheet, ['Total', 'Pagado', 'Restante'])
+      applyCurrencyFormatByHeader(soldItemsSheet, ['Precio unitario', 'Subtotal'])
       summarySheet['!cols'] = [{ wch: 24 }, { wch: 22 }]
       movementsSheet['!cols'] = [
         { wch: 14 },
@@ -350,9 +362,18 @@ export default function AdminFinancePage() {
         { wch: 14 },
         { wch: 14 },
       ]
+      soldItemsSheet['!cols'] = [
+        { wch: 14 },
+        { wch: 34 },
+        { wch: 28 },
+        { wch: 12 },
+        { wch: 16 },
+        { wch: 16 },
+      ]
 
       XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen')
       XLSX.utils.book_append_sheet(workbook, movementsSheet, 'Movimientos')
+      XLSX.utils.book_append_sheet(workbook, soldItemsSheet, 'Productos vendidos')
       XLSX.writeFile(workbook, `finanzas-cataela-${getTodayFileStamp()}.xlsx`)
 
       showToast({
@@ -611,7 +632,11 @@ export default function AdminFinancePage() {
                           <p className="font-semibold text-slate-700">
                             {buildTransactionLabel(transaction)}
                           </p>
-                          {shouldShowProductMeta(transaction) ? (
+                          {transaction.itemsSummary ? (
+                            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
+                              {transaction.itemsSummary}
+                            </p>
+                          ) : shouldShowProductMeta(transaction) ? (
                             <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
                               Producto: {transaction.product.name}
                             </p>
@@ -725,6 +750,20 @@ function PaymentProgress({ transaction }) {
 }
 
 function buildTransactionLabel(transaction) {
+  if (transaction.itemsSummary) {
+    const trimmedDescription = String(transaction.description || '').trim()
+
+    if (!trimmedDescription) {
+      return `Venta - ${transaction.itemsSummary}`
+    }
+
+    if (trimmedDescription.toLowerCase().includes(transaction.itemsSummary.toLowerCase())) {
+      return trimmedDescription
+    }
+
+    return `${trimmedDescription} - ${transaction.itemsSummary}`
+  }
+
   if (!transaction.product?.name) {
     return transaction.description
   }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import FinanceCategoryModal from './FinanceCategoryModal'
 import StatusBadge from '../common/StatusBadge'
 import { useToast } from '../../providers/ToastProvider'
-import { derivePaymentSummary } from '../../services/financeService'
+import { deriveItemsSummary, derivePaymentSummary } from '../../services/financeService'
 import { formatCurrency } from '../../utils/formatters'
 
 const PAYMENT_METHOD_OPTIONS = ['Nequi', 'Efectivo', 'Daviplata', 'Transferencia', 'Otro']
@@ -10,11 +10,10 @@ const PAYMENT_METHOD_OPTIONS = ['Nequi', 'Efectivo', 'Daviplata', 'Transferencia
 const initialState = {
   type: 'income',
   amount: '',
-  product_id: '',
-  quantity: 1,
   description: '',
   category: '',
   transaction_date: '',
+  items: [],
   payments: [],
 }
 
@@ -25,6 +24,13 @@ const emptyPayment = () => ({
   amount: '',
   payment_date: getTodayDate(),
   note: '',
+})
+
+const emptySaleItem = () => ({
+  id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  product_id: '',
+  quantity: 1,
+  unit_price: '',
 })
 
 export default function FinanceForm({
@@ -60,11 +66,10 @@ export default function FinanceForm({
     setFormValues({
       type: selectedTransaction.type,
       amount: selectedTransaction.amount ?? '',
-      product_id: selectedTransaction.product_id || '',
-      quantity: Number(selectedTransaction.quantity || 1),
       description: selectedTransaction.description || '',
       category: selectedTransaction.category || '',
       transaction_date: selectedTransaction.transaction_date || getTodayDate(),
+      items: buildInitialSaleItems(selectedTransaction),
       payments: buildInitialPayments(selectedTransaction),
     })
     setError('')
@@ -77,9 +82,18 @@ export default function FinanceForm({
     [financeCategories, formValues.type],
   )
 
-  const isProductFieldVisible =
+  const isSalesCategory =
     formValues.type === 'income' && formValues.category === 'Ventas'
-  const shouldShowQuantityField = isProductFieldVisible && Boolean(formValues.product_id)
+
+  const normalizedItems = useMemo(
+    () => normalizeDraftSaleItems(formValues.items),
+    [formValues.items],
+  )
+
+  const itemsSummary = useMemo(
+    () => deriveItemsSummary(normalizedItems),
+    [normalizedItems],
+  )
 
   const normalizedPayments = useMemo(
     () => normalizeDraftPayments(formValues.payments),
@@ -109,23 +123,33 @@ export default function FinanceForm({
       setFormValues((current) => ({
         ...current,
         category: '',
-        product_id: '',
-        quantity: 1,
+        items: [],
       }))
     }
   }, [filteredCategories, formValues.category])
 
   useEffect(() => {
-    if (isProductFieldVisible || !formValues.product_id) {
+    if (!isSalesCategory && formValues.items.length) {
+      setFormValues((current) => ({
+        ...current,
+        items: [],
+      }))
+    }
+  }, [isSalesCategory, formValues.items.length])
+
+  useEffect(() => {
+    if (!isSalesCategory || itemsSummary.items.length === 0) {
       return
     }
 
     setFormValues((current) => ({
       ...current,
-      product_id: '',
-      quantity: 1,
+      amount: String(itemsSummary.totalAmount),
+      description: isDescriptionEdited
+        ? current.description
+        : buildSuggestedSaleDescription(itemsSummary.items, products),
     }))
-  }, [isProductFieldVisible, formValues.product_id])
+  }, [isSalesCategory, itemsSummary.totalAmount, itemsSummary.items, isDescriptionEdited, products])
 
   const helperText = useMemo(() => {
     if (paymentSummary.status === 'pending') {
@@ -168,13 +192,12 @@ export default function FinanceForm({
       ...current,
       type: nextType,
       category: '',
-      product_id: '',
-      quantity: 1,
+      items: [],
     }))
     setFieldErrors((current) => {
       const nextErrors = { ...current }
       delete nextErrors.category
-      delete nextErrors.product_id
+      delete nextErrors.items
       delete nextErrors.payments
       return nextErrors
     })
@@ -184,68 +207,62 @@ export default function FinanceForm({
     setFormValues((current) => ({
       ...current,
       category: nextCategory,
-      product_id: nextCategory === 'Ventas' && current.type === 'income' ? current.product_id : '',
-      quantity:
-        nextCategory === 'Ventas' && current.type === 'income' && current.product_id
-          ? current.quantity
-          : 1,
+      items:
+        nextCategory === 'Ventas' && current.type === 'income'
+          ? current.items
+          : [],
     }))
     clearFieldError('category')
+    clearFieldError('items')
   }
 
-  function handleProductChange(productId) {
-    const selectedProduct = products.find((product) => product.id === productId)
-
-    setFormValues((current) => {
-      if (!selectedProduct) {
-        return {
-          ...current,
-          product_id: '',
-          quantity: 1,
-        }
-      }
-
-      const quantity = Number(current.quantity || 1)
-      const nextDescription = isDescriptionEdited
-        ? current.description
-        : buildSuggestedDescription(selectedProduct.name, quantity)
-
-      return {
-        ...current,
-        product_id: selectedProduct.id,
-        description: nextDescription,
-        quantity,
-        amount: String(Number(selectedProduct.price || 0) * quantity),
-      }
-    })
-
-    setFieldErrors((current) => {
-      const nextErrors = { ...current }
-      delete nextErrors.product_id
-      delete nextErrors.amount
-      delete nextErrors.description
-      delete nextErrors.quantity
-      return nextErrors
-    })
-  }
-
-  function handleQuantityChange(value) {
-    const nextQuantity = value === '' ? '' : Math.max(1, Math.floor(Number(value) || 1))
-    const selectedProduct = products.find((product) => product.id === formValues.product_id)
-
+  function handleAddSaleItem() {
     setFormValues((current) => ({
       ...current,
-      quantity: nextQuantity,
-      amount: selectedProduct
-        ? String(Number(selectedProduct.price || 0) * Number(nextQuantity || 1))
-        : current.amount,
-      description:
-        selectedProduct && !isDescriptionEdited
-          ? buildSuggestedDescription(selectedProduct.name, Number(nextQuantity || 1))
-          : current.description,
+      items: [...current.items, emptySaleItem()],
     }))
+    clearFieldError('items')
+  }
 
-    clearFieldError('quantity')
+  function handleRemoveSaleItem(index) {
+    setFormValues((current) => ({
+      ...current,
+      items: current.items.filter((_, itemIndex) => itemIndex !== index),
+    }))
+    clearFieldError('items')
+  }
+
+  function handleSaleItemChange(index, field, value) {
+    setFormValues((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) => {
+        if (itemIndex !== index) {
+          return item
+        }
+
+        if (field === 'product_id') {
+          const selectedProduct = products.find((product) => product.id === value)
+          return {
+            ...item,
+            product_id: value,
+            unit_price: selectedProduct ? String(selectedProduct.price ?? 0) : '',
+          }
+        }
+
+        if (field === 'quantity') {
+          return {
+            ...item,
+            quantity: value === '' ? '' : Math.max(1, Math.floor(Number(value) || 1)),
+          }
+        }
+
+        return {
+          ...item,
+          [field]: value,
+        }
+      }),
+    }))
+    clearFieldError('items')
     clearFieldError('amount')
   }
 
@@ -322,10 +339,6 @@ export default function FinanceForm({
       nextFieldErrors.category = 'Este campo es obligatorio.'
     }
 
-    if (shouldShowQuantityField && (!formValues.quantity || Number(formValues.quantity) < 1)) {
-      nextFieldErrors.quantity = 'La cantidad debe ser al menos 1.'
-    }
-
     if (Object.keys(nextFieldErrors).length) {
       setFieldErrors(nextFieldErrors)
       setError('Revisa los campos.')
@@ -335,6 +348,30 @@ export default function FinanceForm({
         tone: 'error',
       })
       return
+    }
+
+    const cleanItems = normalizedItems.filter(
+      (item) => item.product_id || item.quantity !== '' || item.unit_price !== '',
+    )
+
+    for (const item of cleanItems) {
+      if (!item.product_id) {
+        setFieldErrors({ items: 'Cada producto vendido debe tener un producto seleccionado.' })
+        setError('Cada producto vendido debe tener un producto seleccionado.')
+        return
+      }
+
+      if (!item.quantity || Number(item.quantity) < 1) {
+        setFieldErrors({ items: 'Cada producto vendido debe tener una cantidad valida.' })
+        setError('Cada producto vendido debe tener una cantidad valida.')
+        return
+      }
+
+      if (item.unit_price === '' || Number(item.unit_price) < 0) {
+        setFieldErrors({ items: 'Cada producto vendido debe tener un precio unitario valido.' })
+        setError('Cada producto vendido debe tener un precio unitario valido.')
+        return
+      }
     }
 
     const amount = Number(formValues.amount)
@@ -408,15 +445,15 @@ export default function FinanceForm({
       await onSubmit({
         ...formValues,
         amount,
-        paid_amount: summary.paidAmount,
-        status: summary.status,
-        product_id: isProductFieldVisible ? formValues.product_id || null : null,
-        quantity: shouldShowQuantityField ? Number(formValues.quantity || 1) : null,
+        items: isSalesCategory ? cleanItems : [],
+        payments: cleanPayments,
         description: formValues.description.trim(),
         category: formValues.category.trim(),
-        payment_method: summary.methodsLabel,
-        payments: cleanPayments,
       })
+
+      if (!selectedTransaction) {
+        resetFormAfterCreate()
+      }
     } catch (submitError) {
       setError(submitError.message || 'No fue posible guardar el movimiento.')
     }
@@ -424,6 +461,23 @@ export default function FinanceForm({
 
   async function handleCreateCategory(payload) {
     return onCreateCategory(payload)
+  }
+
+  function resetFormAfterCreate() {
+    const nextType = formValues.type || initialState.type
+    const categoryStillAvailable = financeCategories.some(
+      (category) => category.type === nextType && category.name === formValues.category,
+    )
+
+    setFormValues({
+      ...initialState,
+      type: nextType,
+      category: categoryStillAvailable ? formValues.category : '',
+      transaction_date: getTodayDate(),
+    })
+    setFieldErrors({})
+    setError('')
+    setIsDescriptionEdited(false)
   }
 
   const progressPercentage = getProgressPercentage(formValues.amount, paymentSummary.paidAmount)
@@ -469,6 +523,7 @@ export default function FinanceForm({
               onChange={(event) => updateValue('amount', event.target.value)}
               className={getFieldInputClassName(fieldErrors.amount)}
               placeholder="25000"
+              readOnly={isSalesCategory && itemsSummary.items.length > 0}
             />
           </Field>
 
@@ -504,38 +559,135 @@ export default function FinanceForm({
               className={getFieldInputClassName(fieldErrors.transaction_date)}
             />
           </Field>
-
-          {isProductFieldVisible ? (
-            <Field label="Producto vendido">
-              <select
-                value={formValues.product_id}
-                onChange={(event) => handleProductChange(event.target.value)}
-                className="field-input"
-              >
-                <option value="">Venta manual sin producto</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          ) : null}
-
-          {shouldShowQuantityField ? (
-            <Field label="Cantidad" error={fieldErrors.quantity} required>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={formValues.quantity}
-                onChange={(event) => handleQuantityChange(event.target.value)}
-                className={getFieldInputClassName(fieldErrors.quantity)}
-                placeholder="1"
-              />
-            </Field>
-          ) : null}
         </div>
+
+        {isSalesCategory ? (
+          <section className="mt-6 rounded-[1.8rem] border border-dashed border-blush/55 bg-white/78 p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h3 className="font-display text-2xl text-slate-700">Productos vendidos</h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  Agrega uno o varios productos. El total de la venta se calcula con la suma de
+                  sus subtotales.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddSaleItem}
+                className="btn-secondary w-full md:w-auto"
+              >
+                Agregar producto
+              </button>
+            </div>
+
+            {!formValues.items.length ? (
+              <div className="mt-5 rounded-[1.5rem] border border-dashed border-sand/55 bg-cream/55 px-6 py-8 text-center">
+                <p className="text-sm text-slate-500">
+                  Esta venta puede quedar manual sin productos o puedes agregar los productos
+                  vendidos para calcular el total automaticamente.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-4">
+                {formValues.items.map((item, index) => {
+                  const selectedProduct = products.find((product) => product.id === item.product_id)
+                  const subtotal =
+                    Number(item.quantity || 0) * Number(item.unit_price || 0)
+
+                  return (
+                    <div
+                      key={item.id || `${item.product_id}-${index}`}
+                      className="rounded-[1.7rem] border border-dashed border-sage/55 bg-cream/70 p-5 md:p-6"
+                    >
+                      <div className="grid grid-cols-1 gap-4">
+                        <Field label="Producto" className="w-full min-w-0">
+                          <div className="w-full min-w-0">
+                            <select
+                              value={item.product_id}
+                              onChange={(event) =>
+                                handleSaleItemChange(index, 'product_id', event.target.value)
+                              }
+                              className="field-input w-full min-w-0 overflow-hidden text-ellipsis"
+                            >
+                              <option value="">Selecciona un producto</option>
+                              {products.map((product) => (
+                                <option key={product.id} value={product.id}>
+                                  {product.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </Field>
+
+                        <Field label="Cantidad" className="w-full min-w-0">
+                          <div className="w-full min-w-0">
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={item.quantity}
+                              onChange={(event) =>
+                                handleSaleItemChange(index, 'quantity', event.target.value)
+                              }
+                              className="field-input w-full min-w-0 overflow-hidden text-ellipsis"
+                              placeholder="1"
+                            />
+                          </div>
+                        </Field>
+
+                        <Field label="Precio unitario" className="w-full min-w-0">
+                          <div className="w-full min-w-0">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={item.unit_price}
+                              onChange={(event) =>
+                                handleSaleItemChange(index, 'unit_price', event.target.value)
+                              }
+                              className="field-input w-full min-w-0 overflow-hidden text-ellipsis"
+                              placeholder={selectedProduct ? String(selectedProduct.price ?? 0) : '0'}
+                            />
+                          </div>
+                        </Field>
+
+                        <div className="rounded-[1.4rem] border border-dashed border-mist/55 bg-white/80 p-4">
+                          <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
+                            Subtotal
+                          </p>
+                          <p className="mt-3 text-lg font-semibold text-slate-700">
+                            {formatCurrency(subtotal)}
+                          </p>
+                        </div>
+
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSaleItem(index)}
+                            className="btn-danger w-full sm:w-auto"
+                          >
+                            Quitar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="mt-5 rounded-[1.5rem] border border-dashed border-mist/55 bg-white/82 p-4">
+              <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
+                Total calculado
+              </p>
+              <p className="mt-3 text-2xl font-semibold text-slate-700">
+                {formatCurrency(itemsSummary.totalAmount || Number(formValues.amount || 0))}
+              </p>
+            </div>
+
+            {fieldErrors.items ? <p className="field-error mt-3">{fieldErrors.items}</p> : null}
+          </section>
+        ) : null}
 
         <Field label="Descripcion" className="mt-4" error={fieldErrors.description} required>
           <textarea
@@ -835,6 +987,36 @@ function buildInitialPayments(transaction) {
   return []
 }
 
+function buildInitialSaleItems(transaction) {
+  if (transaction.items?.length) {
+    return transaction.items.map((item) => ({
+      id: item.id,
+      product_id: item.product_id || '',
+      quantity: Number(item.quantity || 1),
+      unit_price: Number(item.unit_price || 0),
+    }))
+  }
+
+  if (transaction.product_id) {
+    const legacyQuantity = Number(transaction.quantity || 1)
+    const legacyUnitPrice =
+      legacyQuantity > 0
+        ? Number(transaction.amount || 0) / legacyQuantity
+        : Number(transaction.product?.price || 0)
+
+    return [
+      {
+        id: 'legacy-item',
+        product_id: transaction.product_id,
+        quantity: legacyQuantity,
+        unit_price: legacyUnitPrice,
+      },
+    ]
+  }
+
+  return []
+}
+
 function mapPaymentToDraft(payment) {
   const method = String(payment.payment_method || '').trim()
   const isKnownMethod = PAYMENT_METHOD_OPTIONS.includes(method) && method !== 'Otro'
@@ -859,6 +1041,15 @@ function normalizeDraftPayments(payments) {
     amount: payment.amount === '' ? '' : Number(payment.amount),
     payment_date: payment.payment_date,
     note: String(payment.note || '').trim(),
+  }))
+}
+
+function normalizeDraftSaleItems(items) {
+  return (items ?? []).map((item) => ({
+    ...item,
+    product_id: item.product_id || '',
+    quantity: item.quantity === '' ? '' : Math.max(1, Math.floor(Number(item.quantity) || 1)),
+    unit_price: item.unit_price === '' ? '' : Number(item.unit_price || 0),
   }))
 }
 
@@ -923,6 +1114,14 @@ function translateStatus(status) {
   return 'Pendiente'
 }
 
-function buildSuggestedDescription(productName, quantity) {
-  return `Venta - ${productName} x ${quantity}`
+function buildSuggestedSaleDescription(items, products) {
+  const summary = items
+    .map((item) => {
+      const product = products.find((entry) => entry.id === item.product_id)
+      return product ? `${product.name} x ${item.quantity}` : null
+    })
+    .filter(Boolean)
+    .join(', ')
+
+  return summary ? `Venta - ${summary}` : 'Venta'
 }

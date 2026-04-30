@@ -27,6 +27,20 @@ const financeFields = `
     payment_date,
     note,
     created_at
+  ),
+  finance_transaction_items (
+    id,
+    transaction_id,
+    product_id,
+    quantity,
+    unit_price,
+    subtotal,
+    created_at,
+    products (
+      id,
+      name,
+      price
+    )
   )
 `
 
@@ -45,30 +59,81 @@ function normalizeFinanceError(error) {
   return error
 }
 
+function normalizeFinanceItems(items) {
+  return [...(items ?? [])]
+    .map((item) => ({
+      ...item,
+      product: item.products ?? null,
+      subtotal: Number(item.subtotal ?? Number(item.quantity || 0) * Number(item.unit_price || 0)),
+    }))
+    .sort((left, right) => {
+      const leftKey = `${left.created_at}-${left.id}`
+      const rightKey = `${right.created_at}-${right.id}`
+      return leftKey.localeCompare(rightKey)
+    })
+}
+
+function buildTransactionItemsSummary(items) {
+  return (items ?? [])
+    .filter((item) => item.product?.name)
+    .map((item) => `${item.product.name} x${item.quantity}`)
+    .join(', ')
+}
+
 function normalizeFinanceTransaction(transaction) {
   const payments = [...(transaction.finance_payments ?? [])].sort((left, right) =>
     `${left.payment_date}-${left.created_at}`.localeCompare(
       `${right.payment_date}-${right.created_at}`,
     ),
   )
+  const items = normalizeFinanceItems(transaction.finance_transaction_items)
   const methodsLabel = buildPaymentMethodsLabel(payments)
 
   return {
     ...transaction,
     product: transaction.products ?? null,
+    items,
+    itemsSummary: buildTransactionItemsSummary(items),
     payments,
     payment_method: methodsLabel || transaction.payment_method || '',
   }
 }
 
+function sanitizeFinanceItems(items) {
+  return (items ?? [])
+    .map((item) => ({
+      product_id: item.product_id || null,
+      quantity: Number(item.quantity || 0),
+      unit_price: Number(item.unit_price || 0),
+    }))
+    .filter((item) => item.product_id && item.quantity > 0)
+}
+
+function deriveItemsSummary(items) {
+  const cleanItems = sanitizeFinanceItems(items)
+  const totalAmount = cleanItems.reduce(
+    (sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0),
+    0,
+  )
+
+  return {
+    items: cleanItems,
+    totalAmount,
+  }
+}
+
 function sanitizeFinancePayload(payload) {
   const paymentSummary = derivePaymentSummary(payload.amount, payload.payments)
+  const itemSummary = deriveItemsSummary(payload.items)
+  const hasItemizedSale =
+    payload.type === 'income' && payload.category === 'Ventas' && itemSummary.items.length > 0
+  const primaryItem = hasItemizedSale && itemSummary.items.length === 1 ? itemSummary.items[0] : null
 
   return {
     amount: payload.amount,
     paid_amount: paymentSummary.paidAmount,
-    product_id: payload.product_id || null,
-    quantity: payload.product_id ? Number(payload.quantity || 1) : null,
+    product_id: primaryItem?.product_id || payload.product_id || null,
+    quantity: primaryItem?.quantity || payload.quantity || null,
     type: payload.type,
     description: payload.description,
     category: payload.category,
@@ -183,6 +248,49 @@ async function replaceFinancePayments(transactionId, payments) {
   return data ?? []
 }
 
+async function replaceFinanceItems(transactionId, items) {
+  const itemRows = sanitizeFinanceItems(items)
+
+  const { error: deleteError } = await supabase
+    .from('finance_transaction_items')
+    .delete()
+    .eq('transaction_id', transactionId)
+
+  if (deleteError) {
+    throw normalizeFinanceError(deleteError)
+  }
+
+  if (!itemRows.length) {
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from('finance_transaction_items')
+    .insert(
+      itemRows.map((item) => ({
+        ...item,
+        transaction_id: transactionId,
+      })),
+    )
+    .select(
+      `
+        id,
+        transaction_id,
+        product_id,
+        quantity,
+        unit_price,
+        subtotal,
+        created_at
+      `,
+    )
+
+  if (error) {
+    throw normalizeFinanceError(error)
+  }
+
+  return data ?? []
+}
+
 export async function fetchFinanceTransactions({ startDate, endDate } = {}) {
   ensureSupabaseConfigured()
 
@@ -261,10 +369,11 @@ export async function createFinanceTransaction(payload) {
   }
 
   try {
+    await replaceFinanceItems(data.id, payload.items)
     await replaceFinancePayments(data.id, payload.payments)
-  } catch (paymentError) {
+  } catch (nestedError) {
     await supabase.from('finance_transactions').delete().eq('id', data.id)
-    throw paymentError
+    throw nestedError
   }
 
   return fetchFinanceTransactionById(data.id)
@@ -277,9 +386,10 @@ export async function updateFinanceTransaction(id, payload, previousTransaction 
   const cleanPayload = sanitizeFinancePayload(payload)
 
   try {
+    await replaceFinanceItems(id, payload.items)
     await replaceFinancePayments(id, payload.payments)
-  } catch (paymentError) {
-    throw paymentError
+  } catch (nestedError) {
+    throw nestedError
   }
 
   const { error } = await supabase
@@ -289,9 +399,10 @@ export async function updateFinanceTransaction(id, payload, previousTransaction 
 
   if (error) {
     try {
+      await replaceFinanceItems(id, previousState.items)
       await replaceFinancePayments(id, previousState.payments)
     } catch {
-      // Best effort restore if the base update fails after replacing payments.
+      // Best effort restore if the base update fails after replacing related rows.
     }
     throw normalizeFinanceError(error)
   }
@@ -309,4 +420,9 @@ export async function deleteFinanceTransaction(id) {
   }
 }
 
-export { derivePaymentSummary, buildPaymentMethodsLabel }
+export {
+  buildPaymentMethodsLabel,
+  buildTransactionItemsSummary,
+  deriveItemsSummary,
+  derivePaymentSummary,
+}
