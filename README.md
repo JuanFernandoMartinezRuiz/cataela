@@ -112,6 +112,21 @@ create table if not exists public.finance_payments (
 );
 ```
 
+Para rifas conectadas con finanzas, `raffle_numbers` tambien debe tener:
+
+- `payment_method text`
+- `finance_transaction_id uuid references public.finance_transactions(id) on delete set null`
+
+Si tu tabla `raffle_numbers` ya existia antes, ejecuta tambien:
+
+```sql
+alter table public.raffle_numbers
+  add column if not exists payment_method text;
+
+alter table public.raffle_numbers
+  add column if not exists finance_transaction_id uuid references public.finance_transactions(id) on delete set null;
+```
+
 Para ventas con multiples productos, crea tambien la tabla `finance_transaction_items`:
 
 ```sql

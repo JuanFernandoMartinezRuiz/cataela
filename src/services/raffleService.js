@@ -3,6 +3,7 @@ import { fetchRaffleImages } from './imageService'
 
 export const raffleNumberStatuses = ['available', 'reserved', 'paid', 'winner']
 export const raffleStatuses = ['draft', 'active', 'closed']
+const RAFFLE_FINANCE_CATEGORY = 'Rifas'
 
 async function closeOtherActiveRaffles(activeRaffleId) {
   const { error } = await supabase
@@ -38,6 +39,165 @@ function buildRaffleSummary(raffle, numbers = []) {
     reservedRevenue: unitPrice * reservedCount,
     paidRevenue,
     pendingRevenue: Math.max(potentialRevenue - paidRevenue, 0),
+  }
+}
+
+function buildRaffleFinanceDescription(raffleTitle, raffleNumber) {
+  return `Rifa - ${raffleTitle} - Numero ${raffleNumber}`
+}
+
+async function fetchRaffleContext(raffleId) {
+  const { data, error } = await supabase
+    .from('raffles')
+    .select('id, title, price_per_number')
+    .eq('id', raffleId)
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+async function findLinkedFinanceTransaction(numberRecord, description) {
+  if (numberRecord.finance_transaction_id) {
+    const { data, error } = await supabase
+      .from('finance_transactions')
+      .select('id')
+      .eq('id', numberRecord.finance_transaction_id)
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    if (data) {
+      return data
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('finance_transactions')
+    .select('id')
+    .eq('type', 'income')
+    .eq('category', RAFFLE_FINANCE_CATEGORY)
+    .eq('description', description)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+async function clearFinanceRelations(transactionId) {
+  const { error: paymentsError } = await supabase
+    .from('finance_payments')
+    .delete()
+    .eq('transaction_id', transactionId)
+
+  if (paymentsError) {
+    throw paymentsError
+  }
+
+  const { error: itemsError } = await supabase
+    .from('finance_transaction_items')
+    .delete()
+    .eq('transaction_id', transactionId)
+
+  if (itemsError) {
+    throw itemsError
+  }
+}
+
+async function syncRaffleFinance(numberRecord, payload) {
+  const raffle = await fetchRaffleContext(payload.raffle_id)
+  const description = buildRaffleFinanceDescription(raffle.title, numberRecord.number)
+  const linkedTransaction = await findLinkedFinanceTransaction(numberRecord, description)
+
+  if (payload.status === 'available') {
+    const { error: unlinkError } = await supabase
+      .from('raffle_numbers')
+      .update({ finance_transaction_id: null })
+      .eq('id', numberRecord.id)
+
+    if (unlinkError) {
+      throw unlinkError
+    }
+
+    if (linkedTransaction?.id) {
+      await clearFinanceRelations(linkedTransaction.id)
+      const { error: deleteError } = await supabase
+        .from('finance_transactions')
+        .delete()
+        .eq('id', linkedTransaction.id)
+
+      if (deleteError) {
+        throw deleteError
+      }
+    }
+
+    return {
+      action: linkedTransaction?.id ? 'deleted' : 'none',
+      transactionId: null,
+    }
+  }
+
+  const amount = Number(raffle.price_per_number || 0)
+  const isPaidLike = payload.status === 'paid' || payload.status === 'winner'
+  const financePayload = {
+    type: 'income',
+    category: RAFFLE_FINANCE_CATEGORY,
+    description,
+    amount,
+    paid_amount: isPaidLike ? amount : 0,
+    status: isPaidLike ? 'completed' : 'pending',
+    transaction_date: new Date().toISOString().slice(0, 10),
+    payment_method: payload.payment_method || null,
+  }
+
+  let transactionId = linkedTransaction?.id || null
+  let action = 'updated'
+
+  if (transactionId) {
+    await clearFinanceRelations(transactionId)
+    const { error: updateError } = await supabase
+      .from('finance_transactions')
+      .update(financePayload)
+      .eq('id', transactionId)
+
+    if (updateError) {
+      throw updateError
+    }
+  } else {
+    const { data, error } = await supabase
+      .from('finance_transactions')
+      .insert(financePayload)
+      .select('id')
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    transactionId = data.id
+    action = 'created'
+  }
+
+  const { error: linkError } = await supabase
+    .from('raffle_numbers')
+    .update({ finance_transaction_id: transactionId })
+    .eq('id', numberRecord.id)
+
+  if (linkError) {
+    throw linkError
+  }
+
+  return {
+    action,
+    transactionId,
   }
 }
 
@@ -132,7 +292,6 @@ export async function fetchActiveRaffle() {
 export async function createRaffle(payload) {
   ensureSupabaseConfigured()
 
-  // Supabase insert for raffle base info.
   const { data, error } = await supabase
     .from('raffles')
     .insert(payload)
@@ -144,7 +303,6 @@ export async function createRaffle(payload) {
   }
 
   if (data.status === 'active') {
-    // Ensure there is only one public active raffle at a time.
     await closeOtherActiveRaffles(data.id)
   }
 
@@ -160,7 +318,6 @@ export async function createRaffleWithNumbers(payload) {
     status: 'available',
   }))
 
-  // Supabase insert for raffle numbers 00-99.
   const { error } = await supabase.from('raffle_numbers').insert(generatedNumbers)
 
   if (error) {
@@ -185,7 +342,6 @@ export async function updateRaffle(id, payload) {
   }
 
   if (payload.status === 'active') {
-    // When a raffle becomes active, all other active raffles are closed.
     await closeOtherActiveRaffles(id)
   }
 
@@ -219,13 +375,13 @@ export async function updateRaffleNumber(id, payload) {
     status: payload.status,
     buyer_name: payload.buyer_name || null,
     buyer_phone: payload.buyer_phone || null,
+    payment_method: payload.payment_method || null,
     paid_at:
       payload.status === 'paid' || payload.status === 'winner'
         ? new Date().toISOString()
         : null,
   }
 
-  // Supabase update for each raffle number state and buyer info.
   const { data, error } = await supabase
     .from('raffle_numbers')
     .update(nextPayload)
@@ -259,7 +415,21 @@ export async function updateRaffleNumber(id, payload) {
     throw raffleSyncError
   }
 
-  return data
+  try {
+    const financeSync = await syncRaffleFinance(data, payload)
+    return {
+      ...data,
+      financeSync,
+    }
+  } catch (financeError) {
+    return {
+      ...data,
+      financeSync: {
+        action: 'error',
+        error: financeError,
+      },
+    }
+  }
 }
 
 export function getRaffleSummary(raffle, numbers) {
@@ -276,6 +446,50 @@ export async function deleteRaffle(raffleId) {
 
   if (imagesError) {
     throw imagesError
+  }
+
+  const { data: raffleNumbers, error: fetchNumbersError } = await supabase
+    .from('raffle_numbers')
+    .select('finance_transaction_id')
+    .eq('raffle_id', raffleId)
+
+  if (fetchNumbersError) {
+    throw fetchNumbersError
+  }
+
+  const financeTransactionIds = [...new Set(
+    (raffleNumbers ?? [])
+      .map((number) => number.finance_transaction_id)
+      .filter(Boolean),
+  )]
+
+  if (financeTransactionIds.length) {
+    const { error: unlinkNumbersError } = await supabase
+      .from('raffle_numbers')
+      .update({ finance_transaction_id: null })
+      .eq('raffle_id', raffleId)
+
+    if (unlinkNumbersError) {
+      throw unlinkNumbersError
+    }
+
+    const { error: deletePaymentsError } = await supabase
+      .from('finance_payments')
+      .delete()
+      .in('transaction_id', financeTransactionIds)
+
+    if (deletePaymentsError) {
+      throw deletePaymentsError
+    }
+
+    const { error: deleteTransactionsError } = await supabase
+      .from('finance_transactions')
+      .delete()
+      .in('id', financeTransactionIds)
+
+    if (deleteTransactionsError) {
+      throw deleteTransactionsError
+    }
   }
 
   const { error: numbersError } = await supabase

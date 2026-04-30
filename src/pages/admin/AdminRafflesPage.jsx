@@ -36,6 +36,8 @@ const emptyRaffleForm = {
   draw_date: '',
 }
 
+const rafflePaymentMethods = ['Nequi', 'Efectivo', 'Daviplata', 'Transferencia', 'Otro']
+
 const statusDescriptions = {
   draft: 'No se muestra al publico.',
   active: 'Se muestra en la pagina publica y oculta cualquier otra rifa activa.',
@@ -50,6 +52,7 @@ export default function AdminRafflesPage() {
   const [numbers, setNumbers] = useState([])
   const [raffleImages, setRaffleImages] = useState([])
   const [raffleForm, setRaffleForm] = useState(emptyRaffleForm)
+  const [isCreateFormOpen, setIsCreateFormOpen] = useState(false)
   const [createMainImageFile, setCreateMainImageFile] = useState(null)
   const [createMainPreview, setCreateMainPreview] = useState('')
   const [createGalleryFiles, setCreateGalleryFiles] = useState([])
@@ -219,6 +222,7 @@ export default function AdminRafflesPage() {
       setCreateGalleryFiles([])
       resetPreviewUrls(createGalleryPreviews)
       setCreateGalleryPreviews([])
+      setIsCreateFormOpen(false)
       if (!galleryUploadFailed) {
         showToast({
           title: 'Elemento guardado',
@@ -359,18 +363,37 @@ export default function AdminRafflesPage() {
       setSaveLabel('Guardando numero...')
       setWarning('')
       setError('')
-      await updateRaffleNumber(numberForm.id, {
+      const updatedNumber = await updateRaffleNumber(numberForm.id, {
         raffle_id: selectedRaffle.id,
         status: numberForm.status,
         buyer_name: numberForm.buyer_name || null,
         buyer_phone: numberForm.buyer_phone || null,
+        payment_method: numberForm.payment_method || null,
       })
       await loadNumbers(selectedRaffle.id)
       showToast({
-        title: 'Elemento guardado',
+        title: 'Numero actualizado',
         description: 'El numero de la rifa se actualizo correctamente.',
         tone: 'success',
       })
+
+      if (updatedNumber.financeSync?.action === 'created' || updatedNumber.financeSync?.action === 'updated') {
+        showToast({
+          title: 'Movimiento financiero generado',
+          description: 'La rifa se sincronizo correctamente con Finanzas.',
+          tone: 'success',
+        })
+      }
+
+      if (updatedNumber.financeSync?.action === 'error') {
+        showToast({
+          title: 'Error al actualizar finanzas',
+          description:
+            updatedNumber.financeSync.error?.message ||
+            'El numero se actualizo, pero no fue posible sincronizar Finanzas.',
+          tone: 'error',
+        })
+      }
     } catch (saveError) {
       setError(saveError.message || 'No fue posible guardar el numero.')
       showToast({
@@ -570,9 +593,26 @@ export default function AdminRafflesPage() {
       {!loading ? (
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <div className="space-y-6">
-            <form onSubmit={handleCreateRaffle} className="admin-panel p-6">
-              <h2 className="font-display text-3xl text-slate-700">Crear nueva rifa</h2>
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="admin-panel p-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="font-display text-3xl text-slate-700">Crear nueva rifa</h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Despliega el formulario solo cuando necesites crear un nuevo sorteo.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateFormOpen((current) => !current)}
+                  className="btn-secondary w-full md:w-auto"
+                >
+                  {isCreateFormOpen ? 'Ocultar formulario' : 'Crear nueva rifa'}
+                </button>
+              </div>
+
+              {isCreateFormOpen ? (
+                <form onSubmit={handleCreateRaffle} className="mt-6">
+                  <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Titulo">
                   <input
                     value={raffleForm.title}
@@ -653,40 +693,42 @@ export default function AdminRafflesPage() {
                     className="field-input"
                   />
                 </Field>
-              </div>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  </div>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   {createMainPreview ? (
-                  <img
-                    src={createMainPreview}
-                    alt="Vista previa principal"
-                    className="h-48 w-full rounded-[1.5rem] object-cover"
-                  />
-                ) : (
-                  <ImagePlaceholder label="Premio principal" className="h-48 w-full" />
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  {createGalleryPreviews.map((preview) => (
                     <img
-                      key={preview}
-                      src={preview}
-                      alt="Vista previa galeria"
-                      className="h-24 w-full rounded-[1.25rem] object-cover"
+                      src={createMainPreview}
+                      alt="Vista previa principal"
+                      className="h-48 w-full rounded-[1.5rem] object-cover"
                     />
-                  ))}
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn-primary mt-6 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {saving ? saveLabel || 'Creando...' : 'Crear rifa y generar numeros'}
-              </button>
-              <p className="mt-3 text-sm text-slate-500">
-                Si la creas como <strong>active</strong>, cualquier otra rifa activa pasara a
-                <strong> closed</strong> automaticamente.
-              </p>
-            </form>
+                  ) : (
+                    <ImagePlaceholder label="Premio principal" className="h-48 w-full" />
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    {createGalleryPreviews.map((preview) => (
+                      <img
+                        key={preview}
+                        src={preview}
+                        alt="Vista previa galeria"
+                        className="h-24 w-full rounded-[1.25rem] object-cover"
+                      />
+                    ))}
+                  </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="btn-primary mt-6 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {saving ? saveLabel || 'Creando...' : 'Crear rifa y generar numeros'}
+                  </button>
+                  <p className="mt-3 text-sm text-slate-500">
+                    Si la creas como <strong>active</strong>, cualquier otra rifa activa pasara a
+                    <strong> closed</strong> automaticamente.
+                  </p>
+                </form>
+              ) : null}
+            </div>
 
             <div className="admin-panel p-6">
               <h2 className="font-display text-3xl text-slate-700">Rifas creadas</h2>
@@ -826,27 +868,34 @@ export default function AdminRafflesPage() {
                     </Field>
                   </div>
 
-                  <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
                     <SummaryCard label="Total" value={summary.total} />
                     <SummaryCard label="Disponibles" value={summary.availableCount} />
                     <SummaryCard label="Apartados" value={summary.reservedCount} />
                     <SummaryCard label="Pagados" value={summary.paidCount} />
-                    <SummaryCard
+                  </div>
+
+                  <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                    <WideSummaryCard
                       label="Ganador"
-                      value={winnerNumber?.number || summary.winnerCount || 'Sin ganador'}
+                      value={winnerNumber?.number || 'Sin ganador'}
                     />
-                    <SummaryCard
-                      label="Ingreso pagado"
-                      value={formatCurrency(summary.paidRevenue)}
-                    />
-                    <SummaryCard
-                      label="Ingreso pendiente"
-                      value={formatCurrency(summary.pendingRevenue)}
-                    />
-                    <SummaryCard
-                      label="Ingreso total esperado"
-                      value={formatCurrency(summary.potentialRevenue)}
-                    />
+                    <WideSummaryCard label="Finanzas de la rifa">
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <FinanceMiniStat
+                          label="Ingreso pagado"
+                          value={formatCurrency(summary.paidRevenue)}
+                        />
+                        <FinanceMiniStat
+                          label="Ingreso pendiente"
+                          value={formatCurrency(summary.pendingRevenue)}
+                        />
+                        <FinanceMiniStat
+                          label="Ingreso total esperado"
+                          value={formatCurrency(summary.potentialRevenue)}
+                        />
+                      </div>
+                    </WideSummaryCard>
                   </div>
 
                   <div className="mt-6 flex flex-wrap gap-3">
@@ -1036,6 +1085,25 @@ export default function AdminRafflesPage() {
                           className="field-input"
                         />
                       </Field>
+                      <Field label="Metodo de pago">
+                        <select
+                          value={numberForm.payment_method || ''}
+                          onChange={(event) =>
+                            setNumberForm((current) => ({
+                              ...current,
+                              payment_method: event.target.value,
+                            }))
+                          }
+                          className="field-input"
+                        >
+                          <option value="">Selecciona un metodo</option>
+                          {rafflePaymentMethods.map((method) => (
+                            <option key={method} value={method}>
+                              {method}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
                       <button
                         type="submit"
                         disabled={saving}
@@ -1070,9 +1138,37 @@ function Field({ label, children, className = '' }) {
 
 function SummaryCard({ label, value }) {
   return (
-    <div className="rounded-[1.4rem] border border-white/70 bg-white/85 p-4 shadow-soft">
+    <div className="flex min-h-[100px] flex-col justify-between overflow-hidden rounded-[1.4rem] border border-white/70 bg-white/85 p-5 text-center shadow-soft">
       <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 font-display text-3xl text-slate-700">{value}</p>
+      <p className="mt-3 break-words font-display text-base leading-tight text-slate-700 sm:text-lg">
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function WideSummaryCard({ label, value, children }) {
+  return (
+    <div className="rounded-[1.5rem] border border-white/70 bg-white/88 p-6 shadow-soft">
+      <p className="text-sm text-slate-500">{label}</p>
+      {children ? (
+        <div className="mt-4">{children}</div>
+      ) : (
+        <p className="mt-4 break-words font-display text-2xl leading-tight text-slate-700">
+          {value}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function FinanceMiniStat({ label, value }) {
+  return (
+    <div className="rounded-[1.2rem] border border-dashed border-mist/60 bg-cream/45 p-4">
+      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{label}</p>
+      <p className="mt-3 break-words text-base font-semibold leading-tight text-slate-700">
+        {value}
+      </p>
     </div>
   )
 }

@@ -4,7 +4,7 @@ import PageHeading from '../common/PageHeading'
 import StatusBadge from '../common/StatusBadge'
 
 export default function ActiveRaffleSection({ raffle }) {
-  const numbers = raffle.numbers ?? []
+  const numbers = (raffle.numbers ?? []).filter((number) => number.status === 'available')
   const gallery = raffle.gallery ?? []
   const winner = raffle.winner
   const hasImages = Boolean(raffle.main_image_url || gallery.length)
@@ -62,11 +62,9 @@ export default function ActiveRaffleSection({ raffle }) {
               </div>
             </div>
             <div className="card-dashed-blue p-5 md:col-span-2">
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <SummaryItem label="Total" value={raffle.summary.total} />
                 <SummaryItem label="Disponibles" value={raffle.summary.availableCount} />
-                <SummaryItem label="Apartados" value={raffle.summary.reservedCount} />
-                <SummaryItem label="Pagados" value={raffle.summary.paidCount} />
                 {winner ? <SummaryItem label="Ganador" value={winner.number} /> : null}
               </div>
             </div>
@@ -132,11 +130,11 @@ export default function ActiveRaffleSection({ raffle }) {
           <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
             Numeros disponibles de la rifa
           </p>
-          <div className="mt-5 grid grid-cols-5 gap-3 sm:grid-cols-6 md:grid-cols-8 xl:grid-cols-10">
+          <div className="mt-5 grid grid-cols-5 gap-1.5 sm:grid-cols-8 md:grid-cols-10 xl:grid-cols-12">
             {numbers.map((number) => (
               <div
                 key={number.id}
-                className={`flex aspect-square items-center justify-center rounded-2xl border text-sm font-semibold shadow-soft ${stateStyles[number.status]}`}
+                className={`flex h-9 w-9 items-center justify-center rounded-full border text-[12px] font-semibold shadow-soft ${stateStyles[number.status]}`}
               >
                 {number.number}
               </div>

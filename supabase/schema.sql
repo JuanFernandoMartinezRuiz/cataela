@@ -59,9 +59,13 @@ create table if not exists public.raffle_numbers (
   status text not null default 'available',
   buyer_name text,
   buyer_phone text,
+  payment_method text,
   paid_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.raffle_numbers
+  add column if not exists payment_method text;
 
 create table if not exists public.raffle_images (
   id uuid primary key default gen_random_uuid(),
@@ -92,6 +96,9 @@ alter table public.finance_transactions
 
 alter table public.finance_transactions
   add column if not exists quantity integer;
+
+alter table public.raffle_numbers
+  add column if not exists finance_transaction_id uuid references public.finance_transactions(id) on delete set null;
 
 create table if not exists public.finance_payments (
   id uuid primary key default gen_random_uuid(),
