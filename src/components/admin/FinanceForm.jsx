@@ -145,11 +145,9 @@ export default function FinanceForm({
     setFormValues((current) => ({
       ...current,
       amount: String(itemsSummary.totalAmount),
-      description: isDescriptionEdited
-        ? current.description
-        : buildSuggestedSaleDescription(itemsSummary.items, products),
+      description: buildSuggestedSaleDescription(itemsSummary.items, products),
     }))
-  }, [isSalesCategory, itemsSummary.totalAmount, itemsSummary.items, isDescriptionEdited, products])
+  }, [isSalesCategory, itemsSummary.totalAmount, itemsSummary.items, products])
 
   const helperText = useMemo(() => {
     if (paymentSummary.status === 'pending') {
@@ -1115,13 +1113,22 @@ function translateStatus(status) {
 }
 
 function buildSuggestedSaleDescription(items, products) {
-  const summary = items
+  const visibleItems = items
     .map((item) => {
       const product = products.find((entry) => entry.id === item.product_id)
-      return product ? `${product.name} x ${item.quantity}` : null
+      return product ? `${product.name} x${item.quantity}` : null
     })
     .filter(Boolean)
-    .join(', ')
+  const summary = visibleItems.join(', ')
+  const totalUnits = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
 
-  return summary ? `Venta - ${summary}` : 'Venta'
+  if (!summary) {
+    return 'Venta'
+  }
+
+  if (visibleItems.length > 1 || totalUnits > 1) {
+    return `Venta (${totalUnits} productos) - ${summary}`
+  }
+
+  return `Venta - ${summary}`
 }
