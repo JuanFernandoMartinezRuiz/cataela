@@ -83,6 +83,7 @@ create table if not exists public.finance_transactions (
   remaining_amount numeric not null default 0,
   product_id uuid references public.products(id) on delete set null,
   quantity integer,
+  buyer_name text,
   description text not null,
   category text,
   payment_method text,
@@ -96,6 +97,9 @@ alter table public.finance_transactions
 
 alter table public.finance_transactions
   add column if not exists quantity integer;
+
+alter table public.finance_transactions
+  add column if not exists buyer_name text;
 
 alter table public.raffle_numbers
   add column if not exists finance_transaction_id uuid references public.finance_transactions(id) on delete set null;

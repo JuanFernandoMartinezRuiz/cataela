@@ -87,6 +87,7 @@ Para vincular ingresos con productos del catalogo, `finance_transactions` tambie
 
 - `product_id uuid references public.products(id) on delete set null`
 - `quantity integer`
+- `buyer_name text`
 
 Si tu tabla `finance_transactions` ya existia antes, ejecuta tambien:
 
@@ -96,6 +97,9 @@ alter table public.finance_transactions
 
 alter table public.finance_transactions
   add column if not exists quantity integer;
+
+alter table public.finance_transactions
+  add column if not exists buyer_name text;
 ```
 
 Para pagos multiples, crea tambien la tabla `finance_payments`:

@@ -10,6 +10,7 @@ const PAYMENT_METHOD_OPTIONS = ['Nequi', 'Efectivo', 'Daviplata', 'Transferencia
 const initialState = {
   type: 'income',
   amount: '',
+  buyer_name: '',
   description: '',
   category: '',
   transaction_date: '',
@@ -66,6 +67,7 @@ export default function FinanceForm({
     setFormValues({
       type: selectedTransaction.type,
       amount: selectedTransaction.amount ?? '',
+      buyer_name: selectedTransaction.buyer_name || '',
       description: selectedTransaction.description || '',
       category: selectedTransaction.category || '',
       transaction_date: selectedTransaction.transaction_date || getTodayDate(),
@@ -84,6 +86,9 @@ export default function FinanceForm({
 
   const isSalesCategory =
     formValues.type === 'income' && formValues.category === 'Ventas'
+  const shouldShowBuyerName =
+    formValues.type === 'income' &&
+    (formValues.category === 'Ventas' || formValues.category === 'Rifas')
 
   const normalizedItems = useMemo(
     () => normalizeDraftSaleItems(formValues.items),
@@ -190,6 +195,7 @@ export default function FinanceForm({
       ...current,
       type: nextType,
       category: '',
+      buyer_name: '',
       items: [],
     }))
     setFieldErrors((current) => {
@@ -205,12 +211,17 @@ export default function FinanceForm({
     setFormValues((current) => ({
       ...current,
       category: nextCategory,
+      buyer_name:
+        current.type === 'income' && (nextCategory === 'Ventas' || nextCategory === 'Rifas')
+          ? current.buyer_name
+          : '',
       items:
         nextCategory === 'Ventas' && current.type === 'income'
           ? current.items
           : [],
     }))
     clearFieldError('category')
+    clearFieldError('buyer_name')
     clearFieldError('items')
   }
 
@@ -443,6 +454,7 @@ export default function FinanceForm({
       await onSubmit({
         ...formValues,
         amount,
+        buyer_name: shouldShowBuyerName ? formValues.buyer_name.trim() : null,
         items: isSalesCategory ? cleanItems : [],
         payments: cleanPayments,
         description: formValues.description.trim(),
@@ -548,6 +560,18 @@ export default function FinanceForm({
               </button>
             </div>
           </Field>
+
+          {shouldShowBuyerName ? (
+            <Field label="Nombre del comprador" error={fieldErrors.buyer_name}>
+              <input
+                type="text"
+                value={formValues.buyer_name}
+                onChange={(event) => updateValue('buyer_name', event.target.value)}
+                className={getFieldInputClassName(fieldErrors.buyer_name)}
+                placeholder="Ej: Juan Perez"
+              />
+            </Field>
+          ) : null}
 
           <Field label="Fecha" error={fieldErrors.transaction_date} required>
             <input

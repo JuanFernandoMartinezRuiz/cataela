@@ -335,6 +335,7 @@ export default function AdminFinancePage() {
           filteredTransactions.map((transaction) => ({
           Fecha: transaction.transaction_date || '',
           Tipo: transaction.type === 'income' ? 'Ingreso' : 'Egreso',
+          Comprador: transaction.buyer_name || '—',
           Estado: translateFinanceStatus(transaction.status),
           Producto: transaction.itemsSummary || transaction.product?.name || '',
           Categoria: transaction.category || 'Sin categoria',
@@ -364,6 +365,7 @@ export default function AdminFinancePage() {
       movementsSheet['!cols'] = [
         { wch: 14 },
         { wch: 12 },
+        { wch: 24 },
         { wch: 24 },
         { wch: 22 },
         { wch: 20 },
@@ -644,6 +646,7 @@ export default function AdminFinancePage() {
                   <tr>
                     <th className="px-6 py-4">Fecha</th>
                     <th className="px-6 py-4">Descripcion</th>
+                    <th className="hidden px-6 py-4 md:table-cell md:min-w-[180px]">Comprador</th>
                     <th className="px-6 py-4 min-w-[220px]">Notas</th>
                     <th className="px-6 py-4">Tipo</th>
                     <th className="px-6 py-4">Estado</th>
@@ -674,10 +677,32 @@ export default function AdminFinancePage() {
                               {getVisibleTransactionDescription(transaction)}
                             </p>
                           ) : null}
+                          {transaction.buyer_name ? (
+                            <p
+                              className="text-xs text-slate-400 md:hidden"
+                              title={transaction.buyer_name}
+                              style={singleLineClampStyle}
+                            >
+                              Comprador: {transaction.buyer_name}
+                            </p>
+                          ) : null}
                           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                             {formatDate(transaction.created_at)}
                           </p>
                         </div>
+                      </td>
+                      <td className="hidden px-6 py-4 md:table-cell">
+                        {transaction.buyer_name ? (
+                          <p
+                            className="text-sm text-slate-500"
+                            title={transaction.buyer_name}
+                            style={singleLineClampStyle}
+                          >
+                            {transaction.buyer_name}
+                          </p>
+                        ) : (
+                          <span className="text-sm text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         {getLatestPaymentNote(transaction) ? (
@@ -846,6 +871,12 @@ const clampToTwoLinesStyle = {
   WebkitBoxOrient: 'vertical',
   WebkitLineClamp: 2,
   overflow: 'hidden',
+}
+
+const singleLineClampStyle = {
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 }
 
 function buildPaidPayments(transaction) {
