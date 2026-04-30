@@ -32,6 +32,7 @@ const financeFields = `
     id,
     transaction_id,
     product_id,
+    product_name,
     quantity,
     unit_price,
     subtotal,
@@ -64,6 +65,7 @@ function normalizeFinanceItems(items) {
     .map((item) => ({
       ...item,
       product: item.products ?? null,
+      product_name: item.product_name || item.products?.name || '',
       subtotal: Number(item.subtotal ?? Number(item.quantity || 0) * Number(item.unit_price || 0)),
     }))
     .sort((left, right) => {
@@ -75,8 +77,8 @@ function normalizeFinanceItems(items) {
 
 function buildTransactionItemsSummary(items) {
   return (items ?? [])
-    .filter((item) => item.product?.name)
-    .map((item) => `${item.product.name} x${item.quantity}`)
+    .filter((item) => item.product?.name || item.product_name)
+    .map((item) => `${item.product?.name || item.product_name} x${item.quantity}`)
     .join(', ')
 }
 
@@ -103,6 +105,7 @@ function sanitizeFinanceItems(items) {
   return (items ?? [])
     .map((item) => ({
       product_id: item.product_id || null,
+      product_name: String(item.product_name || '').trim(),
       quantity: Number(item.quantity || 0),
       unit_price: Number(item.unit_price || 0),
     }))
@@ -249,7 +252,7 @@ async function replaceFinancePayments(transactionId, payments) {
 }
 
 async function replaceFinanceItems(transactionId, items) {
-  const itemRows = sanitizeFinanceItems(items)
+  const itemRows = await resolveFinanceItemRows(items)
 
   const { error: deleteError } = await supabase
     .from('finance_transaction_items')
@@ -277,6 +280,7 @@ async function replaceFinanceItems(transactionId, items) {
         id,
         transaction_id,
         product_id,
+        product_name,
         quantity,
         unit_price,
         subtotal,
@@ -289,6 +293,44 @@ async function replaceFinanceItems(transactionId, items) {
   }
 
   return data ?? []
+}
+
+async function resolveFinanceItemRows(items) {
+  const cleanItems = sanitizeFinanceItems(items)
+
+  if (!cleanItems.length) {
+    return []
+  }
+
+  const productIds = [...new Set(cleanItems.map((item) => item.product_id).filter(Boolean))]
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name')
+    .in('id', productIds)
+
+  if (error) {
+    throw normalizeFinanceError(error)
+  }
+
+  const productMap = new Map((data ?? []).map((product) => [product.id, product]))
+
+  return cleanItems.reduce((rows, item) => {
+    const product = productMap.get(item.product_id)
+    const productName = String(item.product_name || product?.name || '').trim()
+
+    if (!item.product_id || !productName) {
+      throw new Error('Cada producto vendido debe tener un nombre valido antes de guardar.')
+    }
+
+    rows.push({
+      product_id: item.product_id,
+      product_name: productName,
+      quantity: Number(item.quantity || 0),
+      unit_price: Number(item.unit_price || 0),
+    })
+
+    return rows
+  }, [])
 }
 
 export async function fetchFinanceTransactions({ startDate, endDate } = {}) {
@@ -358,6 +400,8 @@ export async function createFinanceTransaction(payload) {
   ensureSupabaseConfigured()
 
   const cleanPayload = sanitizeFinancePayload(payload)
+  const shouldPersistItems = payload.type === 'income' && payload.category === 'Ventas'
+  const itemRows = shouldPersistItems ? await resolveFinanceItemRows(payload.items) : []
   const { data, error } = await supabase
     .from('finance_transactions')
     .insert(cleanPayload)
@@ -369,7 +413,7 @@ export async function createFinanceTransaction(payload) {
   }
 
   try {
-    await replaceFinanceItems(data.id, payload.items)
+    await replaceFinanceItems(data.id, itemRows)
     await replaceFinancePayments(data.id, payload.payments)
   } catch (nestedError) {
     await supabase.from('finance_transactions').delete().eq('id', data.id)
@@ -384,9 +428,11 @@ export async function updateFinanceTransaction(id, payload, previousTransaction 
 
   const previousState = previousTransaction ?? (await fetchFinanceTransactionById(id))
   const cleanPayload = sanitizeFinancePayload(payload)
+  const shouldPersistItems = payload.type === 'income' && payload.category === 'Ventas'
+  const itemRows = shouldPersistItems ? await resolveFinanceItemRows(payload.items) : []
 
   try {
-    await replaceFinanceItems(id, payload.items)
+    await replaceFinanceItems(id, itemRows)
     await replaceFinancePayments(id, payload.payments)
   } catch (nestedError) {
     throw nestedError

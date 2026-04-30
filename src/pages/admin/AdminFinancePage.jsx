@@ -40,6 +40,8 @@ const statusFilters = [
   { value: 'partial', label: 'Parciales' },
 ]
 
+const paymentMethodOrder = ['Efectivo', 'Nequi', 'Daviplata', 'Transferencia', 'Otro']
+
 export default function AdminFinancePage() {
   const { showToast } = useToast()
   const [financeCategories, setFinanceCategories] = useState([])
@@ -286,13 +288,18 @@ export default function AdminFinancePage() {
   )
 
   const summary = useMemo(
-    () => buildFinanceSummary(filteredTransactions),
-    [filteredTransactions],
+    () => buildFinanceSummary(filteredTransactions, activeRange),
+    [filteredTransactions, activeRange],
+  )
+
+  const paymentMethodSummary = useMemo(
+    () => buildPaymentMethodSummary(filteredTransactions, activeRange),
+    [filteredTransactions, activeRange],
   )
 
   const chartMeta = useMemo(
-    () => buildChartData(filteredTransactions, rangeType),
-    [filteredTransactions, rangeType],
+    () => buildChartData(filteredTransactions, rangeType, activeRange),
+    [filteredTransactions, rangeType, activeRange],
   )
 
   const activeFilterLabel = useMemo(() => {
@@ -317,11 +324,15 @@ export default function AdminFinancePage() {
       setExporting(true)
 
       const workbook = XLSX.utils.book_new()
-      const summarySheet = XLSX.utils.aoa_to_sheet(
-        buildSummarySheetRows(activeRange, activeFilterLabel, summary),
+      const summaryRows = buildSummarySheetRows(
+          activeRange,
+          activeFilterLabel,
+          summary,
+          paymentMethodSummary,
       )
-      const movementsSheet = XLSX.utils.json_to_sheet(
-        filteredTransactions.map((transaction) => ({
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows)
+        const movementsSheet = XLSX.utils.json_to_sheet(
+          filteredTransactions.map((transaction) => ({
           Fecha: transaction.transaction_date || '',
           Tipo: transaction.type === 'income' ? 'Ingreso' : 'Egreso',
           Estado: translateFinanceStatus(transaction.status),
@@ -330,8 +341,8 @@ export default function AdminFinancePage() {
           Descripcion: transaction.description || '',
           'Metodo de pago': transaction.payment_method || 'Sin metodo',
           Total: Number(transaction.amount || 0),
-          Pagado: Number(transaction.paid_amount || 0),
-          Restante: Number(transaction.remaining_amount || 0),
+          Pagado: getEffectivePaidAmount(transaction, activeRange),
+          Restante: getEffectiveRemainingAmount(transaction, activeRange),
         })),
       )
       const soldItemsRows = filteredTransactions.flatMap((transaction) =>
@@ -346,7 +357,7 @@ export default function AdminFinancePage() {
       )
       const soldItemsSheet = XLSX.utils.json_to_sheet(soldItemsRows)
 
-      applyCurrencyFormat(summarySheet, ['B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11'])
+      applyCurrencyFormat(summarySheet, getSummaryCurrencyRefs(summaryRows))
       applyCurrencyFormatByHeader(movementsSheet, ['Total', 'Pagado', 'Restante'])
       applyCurrencyFormatByHeader(soldItemsSheet, ['Precio unitario', 'Subtotal'])
       summarySheet['!cols'] = [{ wch: 24 }, { wch: 22 }]
@@ -447,6 +458,27 @@ export default function AdminFinancePage() {
               label="Pendientes por pagar"
               value={formatCurrency(summary.pendingPayables)}
             />
+          </div>
+        </section>
+
+        <section className="admin-panel p-6">
+          <div className="flex flex-col gap-2">
+            <h2 className="font-display text-3xl text-slate-700">
+              Dinero por metodo de pago
+            </h2>
+            <p className="text-sm text-slate-500">
+              Totales registrados por metodo dentro del rango y filtros activos.
+            </p>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5">
+            {paymentMethodOrder.map((method) => (
+              <SummaryCard
+                key={method}
+                label={`Total en ${method}`}
+                value={formatCurrency(paymentMethodSummary[method] || 0)}
+              />
+            ))}
           </div>
         </section>
       </div>
@@ -661,12 +693,19 @@ export default function AdminFinancePage() {
                         {transaction.payment_method || 'Sin metodo'}
                       </td>
                       <td className="px-6 py-4">{formatCurrency(transaction.amount)}</td>
-                      <td className="px-6 py-4">{formatCurrency(transaction.paid_amount)}</td>
                       <td className="px-6 py-4">
-                        {formatCurrency(transaction.remaining_amount)}
+                        {formatCurrency(getEffectivePaidAmount(transaction, activeRange))}
                       </td>
                       <td className="px-6 py-4">
-                        <PaymentProgress transaction={transaction} />
+                        {formatCurrency(getEffectiveRemainingAmount(transaction, activeRange))}
+                      </td>
+                      <td className="px-6 py-4">
+                        <PaymentProgress
+                          amount={Number(transaction.amount || 0)}
+                          paidAmount={getEffectivePaidAmount(transaction, activeRange)}
+                          remainingAmount={getEffectiveRemainingAmount(transaction, activeRange)}
+                          status={transaction.status}
+                        />
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex min-w-[210px] flex-wrap gap-2">
@@ -722,12 +761,12 @@ function SummaryCard({ label, value }) {
   )
 }
 
-function PaymentProgress({ transaction }) {
-  const progress = getProgressPercentage(transaction)
+function PaymentProgress({ amount, paidAmount, remainingAmount, status }) {
+  const progress = getProgressPercentage(amount, paidAmount)
   const barTone =
-    transaction.status === 'completed'
+    status === 'completed'
       ? 'bg-sage'
-      : transaction.status === 'pending'
+      : status === 'pending'
         ? 'bg-mist/28'
         : 'bg-sun/75'
 
@@ -741,9 +780,9 @@ function PaymentProgress({ transaction }) {
       </div>
       <div className="space-y-1 text-xs text-slate-500">
         <p>
-          Pagado: {formatCurrency(transaction.paid_amount)} / {formatCurrency(transaction.amount)}
+          Pagado: {formatCurrency(paidAmount)} / {formatCurrency(amount)}
         </p>
-        <p>Restante: {formatCurrency(transaction.remaining_amount)}</p>
+        <p>Restante: {formatCurrency(remainingAmount)}</p>
       </div>
     </div>
   )
@@ -840,12 +879,12 @@ function filterTransactions(transactions, typeFilter, statusFilter) {
   })
 }
 
-function buildFinanceSummary(transactions) {
+function buildFinanceSummary(transactions, activeRange) {
   return transactions.reduce(
     (summary, transaction) => {
       const amount = Number(transaction.amount || 0)
-      const paidAmount = Number(transaction.paid_amount || 0)
-      const remainingAmount = Number(transaction.remaining_amount || 0)
+      const paidAmount = getEffectivePaidAmount(transaction, activeRange)
+      const remainingAmount = Math.max(0, amount - paidAmount)
 
       if (transaction.type === 'income') {
         summary.totalIncomeExpected += amount
@@ -882,7 +921,27 @@ function buildFinanceSummary(transactions) {
   )
 }
 
-function buildChartData(transactions, rangeType) {
+function buildPaymentMethodSummary(transactions, activeRange) {
+  const summary = paymentMethodOrder.reduce((accumulator, method) => {
+    accumulator[method] = 0
+    return accumulator
+  }, {})
+
+  transactions.forEach((transaction) => {
+    getPaymentsInRange(transaction, activeRange).forEach((payment) => {
+      const method = normalizePaymentMethod(payment.payment_method)
+      const signedAmount =
+        transaction.type === 'expense'
+          ? Number(payment.amount || 0) * -1
+          : Number(payment.amount || 0)
+      summary[method] += signedAmount
+    })
+  })
+
+  return summary
+}
+
+function buildChartData(transactions, rangeType, activeRange) {
   const shouldGroupByMonth = rangeType === 'year'
   const map = new Map()
 
@@ -913,7 +972,7 @@ function buildChartData(transactions, rangeType) {
     }
 
     const current = map.get(key)
-    const paidAmount = Number(transaction.paid_amount || 0)
+    const paidAmount = getEffectivePaidAmount(transaction, activeRange)
     const amount = Number(transaction.amount || 0)
 
     if (transaction.type === 'income') {
@@ -931,6 +990,44 @@ function buildChartData(transactions, rangeType) {
     groupedBy: shouldGroupByMonth ? 'month' : 'date',
     data: Array.from(map.values()).sort((left, right) => left.key.localeCompare(right.key)),
   }
+}
+
+function getPaymentsInRange(transaction, activeRange) {
+  return (transaction.payments ?? []).filter((payment) =>
+    isDateWithinRange(payment.payment_date, activeRange),
+  )
+}
+
+function getEffectivePaidAmount(transaction, activeRange) {
+  const paymentsInRange = getPaymentsInRange(transaction, activeRange)
+  const hasLinkedPayments = (transaction.payments ?? []).length > 0
+
+  if (hasLinkedPayments) {
+    return paymentsInRange.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+  }
+
+  return Number(transaction.paid_amount || 0)
+}
+
+function getEffectiveRemainingAmount(transaction, activeRange) {
+  const amount = Number(transaction.amount || 0)
+  return Math.max(0, amount - getEffectivePaidAmount(transaction, activeRange))
+}
+
+function isDateWithinRange(dateValue, activeRange) {
+  if (!dateValue) {
+    return false
+  }
+
+  if (activeRange?.startDate && dateValue < activeRange.startDate) {
+    return false
+  }
+
+  if (activeRange?.endDate && dateValue > activeRange.endDate) {
+    return false
+  }
+
+  return true
 }
 
 function buildDateRange(rangeType, customRange) {
@@ -1013,10 +1110,7 @@ function translateFinanceStatus(status) {
   return 'Pendiente'
 }
 
-function getProgressPercentage(transaction) {
-  const amount = Number(transaction.amount || 0)
-  const paidAmount = Number(transaction.paid_amount || 0)
-
+function getProgressPercentage(amount, paidAmount) {
   if (amount <= 0) {
     return 0
   }
@@ -1024,7 +1118,7 @@ function getProgressPercentage(transaction) {
   return Math.max(0, Math.min(100, (paidAmount / amount) * 100))
 }
 
-function buildSummarySheetRows(activeRange, activeFilterLabel, summary) {
+function buildSummarySheetRows(activeRange, activeFilterLabel, summary, paymentMethodSummary) {
   return [
     ['Resumen financiero'],
     [`Rango: ${activeRange.startDate} al ${activeRange.endDate}`],
@@ -1038,7 +1132,40 @@ function buildSummarySheetRows(activeRange, activeFilterLabel, summary) {
     ['Pendientes por pagar', Number(summary.pendingPayables || 0)],
     ['Ingresos pagados', Number(summary.paidIncome || 0)],
     ['Egresos pagados', Number(summary.paidExpense || 0)],
+    ['Total en Efectivo', Number(paymentMethodSummary.Efectivo || 0)],
+    ['Total en Nequi', Number(paymentMethodSummary.Nequi || 0)],
+    ['Total en Daviplata', Number(paymentMethodSummary.Daviplata || 0)],
+    ['Total en Transferencia', Number(paymentMethodSummary.Transferencia || 0)],
+    ['Total en Otro', Number(paymentMethodSummary.Otro || 0)],
   ]
+}
+
+function getSummaryCurrencyRefs(summaryRows) {
+  return summaryRows
+    .map((row, index) => (index >= 4 && row.length > 1 ? `B${index + 1}` : null))
+    .filter(Boolean)
+}
+
+function normalizePaymentMethod(paymentMethod) {
+  const method = String(paymentMethod || '').trim().toLowerCase()
+
+  if (method === 'efectivo') {
+    return 'Efectivo'
+  }
+
+  if (method === 'nequi') {
+    return 'Nequi'
+  }
+
+  if (method === 'daviplata') {
+    return 'Daviplata'
+  }
+
+  if (method === 'transferencia') {
+    return 'Transferencia'
+  }
+
+  return 'Otro'
 }
 
 function applyCurrencyFormat(sheet, cellRefs) {

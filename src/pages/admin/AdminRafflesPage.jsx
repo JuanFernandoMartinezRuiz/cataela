@@ -377,7 +377,7 @@ export default function AdminRafflesPage() {
         tone: 'success',
       })
 
-      if (updatedNumber.financeSync?.action === 'created' || updatedNumber.financeSync?.action === 'updated') {
+      if (updatedNumber.financeSync?.notifySuccess) {
         showToast({
           title: 'Movimiento financiero generado',
           description: 'La rifa se sincronizo correctamente con Finanzas.',
