@@ -6,6 +6,7 @@ const initialState = {
   type: 'income',
   amount: '',
   paid_amount: '',
+  product_id: '',
   description: '',
   category: '',
   payment_method: '',
@@ -15,6 +16,7 @@ const initialState = {
 
 export default function FinanceForm({
   financeCategories,
+  products = [],
   selectedTransaction,
   saving,
   saveLabel,
@@ -47,6 +49,7 @@ export default function FinanceForm({
         selectedTransaction.status === 'partial'
           ? selectedTransaction.paid_amount
           : '',
+      product_id: selectedTransaction.product_id || '',
       description: selectedTransaction.description || '',
       category: selectedTransaction.category || '',
       payment_method: selectedTransaction.payment_method || '',
@@ -108,6 +111,55 @@ export default function FinanceForm({
 
       const nextErrors = { ...current }
       delete nextErrors[field]
+      return nextErrors
+    })
+  }
+
+  function handleTypeChange(nextType) {
+    setFormValues((current) => ({
+      ...current,
+      type: nextType,
+      product_id: nextType === 'income' ? current.product_id : '',
+    }))
+    setFieldErrors((current) => {
+      const nextErrors = { ...current }
+      delete nextErrors.product_id
+      return nextErrors
+    })
+  }
+
+  function handleProductChange(productId) {
+    const selectedProduct = products.find((product) => product.id === productId)
+
+    setFormValues((current) => {
+      if (!selectedProduct) {
+        return {
+          ...current,
+          product_id: '',
+        }
+      }
+
+      const nextDescription =
+        current.description.trim().length > 0
+          ? current.description
+          : `Venta - ${selectedProduct.name}`
+
+      return {
+        ...current,
+        product_id: selectedProduct.id,
+        description: nextDescription,
+        amount:
+          current.amount === '' || Number(current.amount) <= 0
+            ? String(selectedProduct.price ?? '')
+            : current.amount,
+      }
+    })
+
+    setFieldErrors((current) => {
+      const nextErrors = { ...current }
+      delete nextErrors.product_id
+      delete nextErrors.amount
+      delete nextErrors.description
       return nextErrors
     })
   }
@@ -216,6 +268,7 @@ export default function FinanceForm({
         ...formValues,
         amount,
         paid_amount: paidAmount,
+        product_id: formValues.type === 'income' ? formValues.product_id || null : null,
         description: formValues.description.trim(),
         category: formValues.category.trim(),
         payment_method: formValues.payment_method.trim(),
@@ -252,7 +305,7 @@ export default function FinanceForm({
           <Field label="Tipo">
             <select
               value={formValues.type}
-              onChange={(event) => updateValue('type', event.target.value)}
+              onChange={(event) => handleTypeChange(event.target.value)}
               className="field-input"
             >
               <option value="income">Ingreso</option>
@@ -283,6 +336,23 @@ export default function FinanceForm({
               placeholder="25000"
             />
           </Field>
+
+          {formValues.type === 'income' ? (
+            <Field label="Producto vendido">
+              <select
+                value={formValues.product_id}
+                onChange={(event) => handleProductChange(event.target.value)}
+                className="field-input"
+              >
+                <option value="">Ingreso manual sin producto</option>
+                {products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
 
           <Field label="Fecha" error={fieldErrors.transaction_date} required>
             <input

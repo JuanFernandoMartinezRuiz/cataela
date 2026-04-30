@@ -8,6 +8,7 @@ import StatusBadge from '../../components/common/StatusBadge'
 import FinanceChart from '../../components/admin/FinanceChart'
 import FinanceForm from '../../components/admin/FinanceForm'
 import { useToast } from '../../providers/ToastProvider'
+import { fetchActiveProductOptions } from '../../services/productService'
 import {
   createFinanceCategory,
   createFinanceTransaction,
@@ -42,6 +43,7 @@ const statusFilters = [
 export default function AdminFinancePage() {
   const { showToast } = useToast()
   const [financeCategories, setFinanceCategories] = useState([])
+  const [products, setProducts] = useState([])
   const [transactions, setTransactions] = useState([])
   const [rangeType, setRangeType] = useState('month')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -67,6 +69,7 @@ export default function AdminFinancePage() {
 
   useEffect(() => {
     loadCategories()
+    loadProducts()
   }, [])
 
   useEffect(() => {
@@ -79,6 +82,21 @@ export default function AdminFinancePage() {
       setFinanceCategories(rows)
     } catch (loadError) {
       setError(loadError.message || 'No fue posible cargar las categorias financieras.')
+    }
+  }
+
+  async function loadProducts() {
+    try {
+      const rows = await fetchActiveProductOptions()
+      setProducts(rows)
+    } catch (loadError) {
+      setProducts([])
+      showToast({
+        title: 'Error al cargar productos',
+        description:
+          loadError.message || 'No fue posible cargar los productos activos del catalogo.',
+        tone: 'error',
+      })
     }
   }
 
@@ -189,6 +207,7 @@ export default function AdminFinancePage() {
       const updated = await updateFinanceTransaction(transaction.id, {
         amount: Number(transaction.amount || 0),
         paid_amount: Number(transaction.amount || 0),
+        product_id: transaction.product_id || null,
         type: transaction.type,
         description: transaction.description,
         category: transaction.category,
@@ -304,6 +323,7 @@ export default function AdminFinancePage() {
           Fecha: transaction.transaction_date || '',
           Tipo: transaction.type === 'income' ? 'Ingreso' : 'Egreso',
           Estado: translateFinanceStatus(transaction.status),
+          Producto: transaction.product?.name || '',
           Categoria: transaction.category || 'Sin categoria',
           Descripcion: transaction.description || '',
           'Metodo de pago': transaction.payment_method || 'Sin metodo',
@@ -319,6 +339,7 @@ export default function AdminFinancePage() {
       movementsSheet['!cols'] = [
         { wch: 14 },
         { wch: 12 },
+        { wch: 24 },
         { wch: 22 },
         { wch: 20 },
         { wch: 38 },
@@ -410,6 +431,7 @@ export default function AdminFinancePage() {
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <FinanceForm
           financeCategories={financeCategories}
+          products={products}
           selectedTransaction={selectedTransaction}
           saving={saving}
           saveLabel={saveLabel}
@@ -584,7 +606,14 @@ export default function AdminFinancePage() {
                       <td className="px-6 py-4">{formatDate(transaction.transaction_date)}</td>
                       <td className="px-6 py-4">
                         <div>
-                          <p className="font-semibold text-slate-700">{transaction.description}</p>
+                          <p className="font-semibold text-slate-700">
+                            {buildTransactionLabel(transaction)}
+                          </p>
+                          {shouldShowProductMeta(transaction) ? (
+                            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
+                              Producto: {transaction.product.name}
+                            </p>
+                          ) : null}
                           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                             {formatDate(transaction.created_at)}
                           </p>
@@ -691,6 +720,34 @@ function PaymentProgress({ transaction }) {
       </div>
     </div>
   )
+}
+
+function buildTransactionLabel(transaction) {
+  if (!transaction.product?.name) {
+    return transaction.description
+  }
+
+  const trimmedDescription = String(transaction.description || '').trim()
+  const productName = transaction.product.name
+
+  if (!trimmedDescription) {
+    return `Venta - ${productName}`
+  }
+
+  if (trimmedDescription.toLowerCase().includes(productName.toLowerCase())) {
+    return trimmedDescription
+  }
+
+  return `${trimmedDescription} - ${productName}`
+}
+
+function shouldShowProductMeta(transaction) {
+  if (!transaction.product?.name) {
+    return false
+  }
+
+  const trimmedDescription = String(transaction.description || '').trim().toLowerCase()
+  return !trimmedDescription.includes(transaction.product.name.toLowerCase())
 }
 
 function filterTransactions(transactions, typeFilter, statusFilter) {

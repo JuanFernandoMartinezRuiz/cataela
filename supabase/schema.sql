@@ -77,6 +77,7 @@ create table if not exists public.finance_transactions (
   amount numeric not null default 0,
   paid_amount numeric not null default 0,
   remaining_amount numeric not null default 0,
+  product_id uuid references public.products(id) on delete set null,
   description text not null,
   category text,
   payment_method text,
@@ -84,6 +85,9 @@ create table if not exists public.finance_transactions (
   status text not null default 'completed' check (status in ('completed', 'pending', 'partial')),
   created_at timestamptz not null default now()
 );
+
+alter table public.finance_transactions
+  add column if not exists product_id uuid references public.products(id) on delete set null;
 
 create table if not exists public.finance_categories (
   id uuid primary key default gen_random_uuid(),

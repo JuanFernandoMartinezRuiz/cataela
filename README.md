@@ -81,6 +81,17 @@ alter table public.products add column if not exists image_position_y numeric no
 alter table public.products add column if not exists image_zoom numeric not null default 1;
 ```
 
+Para vincular ingresos con productos del catalogo, `finance_transactions` tambien debe tener:
+
+- `product_id uuid references public.products(id) on delete set null`
+
+Si tu tabla `finance_transactions` ya existia antes, ejecuta tambien:
+
+```sql
+alter table public.finance_transactions
+  add column if not exists product_id uuid references public.products(id) on delete set null;
+```
+
 Tambien agrega:
 
 - `uuid` por defecto con `gen_random_uuid()`

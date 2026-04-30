@@ -65,6 +65,22 @@ export async function fetchPublicProducts() {
   return (data ?? []).map(normalizeProduct)
 }
 
+export async function fetchActiveProductOptions() {
+  ensureSupabaseConfigured()
+
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name, price')
+    .eq('is_active', true)
+    .order('name')
+
+  if (error) {
+    throw mapProductError(error)
+  }
+
+  return data ?? []
+}
+
 export async function fetchAdminProducts() {
   ensureSupabaseConfigured()
 

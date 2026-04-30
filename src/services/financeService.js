@@ -6,12 +6,18 @@ const financeFields = `
   amount,
   paid_amount,
   remaining_amount,
+  product_id,
   description,
   category,
   payment_method,
   transaction_date,
   status,
-  created_at
+  created_at,
+  products (
+    id,
+    name,
+    price
+  )
 `
 
 const financeCategoryFields = `
@@ -33,12 +39,20 @@ function sanitizeFinancePayload(payload) {
   return {
     amount: payload.amount,
     paid_amount: payload.paid_amount,
+    product_id: payload.product_id || null,
     type: payload.type,
     description: payload.description,
     category: payload.category,
     payment_method: payload.payment_method,
     transaction_date: payload.transaction_date,
     status: payload.status,
+  }
+}
+
+function normalizeFinanceTransaction(transaction) {
+  return {
+    ...transaction,
+    product: transaction.products ?? null,
   }
 }
 
@@ -65,7 +79,7 @@ export async function fetchFinanceTransactions({ startDate, endDate } = {}) {
     throw normalizeFinanceError(error)
   }
 
-  return data ?? []
+  return (data ?? []).map(normalizeFinanceTransaction)
 }
 
 export async function fetchFinanceCategories() {
@@ -102,7 +116,7 @@ export async function createFinanceCategory(payload) {
     throw normalizeFinanceError(error)
   }
 
-  return data
+  return normalizeFinanceTransaction(data)
 }
 
 export async function createFinanceTransaction(payload) {
@@ -118,7 +132,7 @@ export async function createFinanceTransaction(payload) {
     throw normalizeFinanceError(error)
   }
 
-  return data
+  return normalizeFinanceTransaction(data)
 }
 
 export async function updateFinanceTransaction(id, payload) {
