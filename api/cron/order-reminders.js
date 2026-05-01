@@ -31,14 +31,58 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  if (!isAuthorized(req)) {
+  const isTestMode = req.query?.test === 'true'
+
+  if (!isTestMode && !isAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
   try {
     const config = getServerConfig()
     const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey)
-    const resend = new Resend(config.resendApiKey)
+    const resend = new Resend(process.env.RESEND_API_KEY)
+    const recipients = parseRecipients(process.env.ORDER_REMINDER_EMAILS)
+
+    if (isTestMode) {
+      const testRecipient = recipients[0]
+
+      if (!testRecipient) {
+        throw new Error('No hay un correo disponible en ORDER_REMINDER_EMAILS para la prueba.')
+      }
+
+      const subject = 'Test correo Cataela'
+      const currentDate = formatDate(getBogotaDateOffset(0))
+      const html = `
+        <div style="font-family: Georgia, serif; color: #334155; line-height: 1.7;">
+          <h2 style="color: #566b7f;">Prueba de correo de Cataela</h2>
+          <p>Si recibes esto, Resend está funcionando correctamente.</p>
+          <p><strong>Fecha actual:</strong> ${escapeHtml(currentDate)}</p>
+          <p>Este mensaje fue generado en modo de prueba desde el endpoint de recordatorios.</p>
+        </div>
+      `
+      const text = [
+        'Test correo Cataela',
+        '',
+        `Fecha actual: ${currentDate}`,
+        'Si recibes esto, Resend está funcionando correctamente',
+      ].join('\n')
+
+      const result = await sendEmail({
+        resend,
+        recipients: [testRecipient],
+        subject,
+        text,
+        html,
+      })
+
+      return res.status(200).json({
+        ok: true,
+        message: 'Correo enviado correctamente',
+        test: true,
+        recipient: testRecipient,
+        result,
+      })
+    }
 
     const sevenDaysDate = getBogotaDateOffset(7)
     const oneDayDate = getBogotaDateOffset(1)
@@ -48,7 +92,6 @@ export default async function handler(req, res) {
       fetchReminderOrders(supabase, oneDayDate, 'reminder_1_day_sent'),
     ])
 
-    const recipients = parseRecipients(config.orderReminderEmails)
     const results = {
       sent7Days: 0,
       sent1Day: 0,
@@ -89,10 +132,12 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
+      message: 'Correo enviado correctamente',
       date: getBogotaDateOffset(0),
       ...results,
     })
   } catch (error) {
+    console.error('order-reminders error:', error)
     return res.status(500).json({
       ok: false,
       error: error.message || 'Unexpected error sending order reminders.',
@@ -139,7 +184,6 @@ function getServerConfig() {
 
   return {
     resendApiKey,
-    orderReminderEmails,
     supabaseUrl,
     supabaseServiceRoleKey,
   }
@@ -231,9 +275,9 @@ async function sendOrderReminder({ resend, recipients, order, daysAhead }) {
     </div>
   `
 
-  await resend.emails.send({
-    from: 'Cataela <onboarding@resend.dev>',
-    to: recipients,
+  await sendEmail({
+    resend,
+    recipients,
     subject,
     text,
     html,
@@ -243,10 +287,31 @@ async function sendOrderReminder({ resend, recipients, order, daysAhead }) {
 }
 
 function parseRecipients(value) {
-  return String(value || '')
+  return (value || '')
     .split(',')
     .map((email) => email.trim())
     .filter(Boolean)
+}
+
+async function sendEmail({ resend, recipients, subject, text, html }) {
+  console.log('Resend recipients:', recipients)
+  console.log('Resend subject:', subject)
+
+  try {
+    const result = await resend.emails.send({
+      from: 'Cataela <onboarding@resend.dev>',
+      to: recipients,
+      subject,
+      text,
+      html,
+    })
+
+    console.log('Resend result:', result)
+    return result
+  } catch (error) {
+    console.error('Resend send error:', error)
+    throw error
+  }
 }
 
 function getBogotaDateOffset(days) {
