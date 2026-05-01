@@ -3,22 +3,11 @@ const currencyFormatter = new Intl.NumberFormat('es-CO', {
   currency: 'COP',
   maximumFractionDigits: 0,
 })
-
-const dateFormatter = new Intl.DateTimeFormat('es-CO', {
-  dateStyle: 'medium',
-})
+export { formatDate } from './date'
 
 export function formatCurrency(value) {
   const numberValue = Number(value || 0)
   return currencyFormatter.format(Number.isNaN(numberValue) ? 0 : numberValue)
-}
-
-export function formatDate(value) {
-  if (!value) {
-    return 'Sin fecha'
-  }
-
-  return dateFormatter.format(new Date(value))
 }
 
 export function truncateText(text = '', maxLength = 110) {

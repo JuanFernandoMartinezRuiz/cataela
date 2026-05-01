@@ -1,4 +1,5 @@
 import { ensureSupabaseConfigured, supabase } from '../lib/supabaseClient'
+import { getDateValue } from '../utils/date'
 import { fetchRaffleImages } from './imageService'
 
 export const raffleNumberStatuses = ['available', 'reserved', 'paid', 'winner']
@@ -313,7 +314,7 @@ async function syncRaffleFinance(numberRecord, payload) {
     description,
     legacyDescription,
   ])
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getDateValue(new Date())
 
   if (payload.status === 'available') {
     const { error: unlinkError } = await supabase

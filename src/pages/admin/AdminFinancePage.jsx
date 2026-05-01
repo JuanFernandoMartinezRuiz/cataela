@@ -10,6 +10,7 @@ import FinanceForm from '../../components/admin/FinanceForm'
 import { useToast } from '../../providers/ToastProvider'
 import { fetchAvailableEssences } from '../../services/essenceService'
 import { fetchActiveProductOptions } from '../../services/productService'
+import { getDateValue } from '../../utils/date'
 import {
   createFinanceCategory,
   createFinanceTransaction,
@@ -1345,9 +1346,7 @@ function buildDateRange(rangeType, customRange) {
 }
 
 function toDateInputValue(date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 10)
+  return getDateValue(date)
 }
 
 function sortTransactions(transactions) {
@@ -1464,9 +1463,9 @@ function applyCurrencyFormatByHeader(sheet, headers) {
 }
 
 function getTodayFileStamp() {
-  return new Date().toISOString().slice(0, 10)
+  return getDateValue(new Date())
 }
 
 function getTodayDate() {
-  return new Date().toISOString().slice(0, 10)
+  return getDateValue(new Date())
 }

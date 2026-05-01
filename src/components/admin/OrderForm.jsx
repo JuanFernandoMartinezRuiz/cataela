@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import ScentsSelector from './ScentsSelector'
+import { getDateValue } from '../../utils/date'
 import { formatCurrency } from '../../utils/formatters'
 
 const orderStatusOptions = [
@@ -654,11 +655,7 @@ function getFieldInputClassName(hasError) {
 }
 
 function getTodayDate() {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return getDateValue(new Date())
 }
 
 function normalizeDraftItems(items) {

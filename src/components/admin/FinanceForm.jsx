@@ -4,6 +4,7 @@ import ScentsSelector from './ScentsSelector'
 import StatusBadge from '../common/StatusBadge'
 import { useToast } from '../../providers/ToastProvider'
 import { deriveItemsSummary, derivePaymentSummary } from '../../services/financeService'
+import { getDateValue } from '../../utils/date'
 import { formatCurrency } from '../../utils/formatters'
 
 const PAYMENT_METHOD_OPTIONS = ['Nequi', 'Efectivo', 'Daviplata', 'Transferencia', 'Otro']
@@ -1010,7 +1011,7 @@ function getFieldInputClassName(hasError) {
 }
 
 function getTodayDate() {
-  return new Date().toISOString().slice(0, 10)
+  return getDateValue(new Date())
 }
 
 function buildInitialPayments(transaction) {
