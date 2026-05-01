@@ -17,6 +17,15 @@ const paymentStatusOptions = [
   { value: 'paid', label: 'Pagado' },
 ]
 
+const paymentMethodOptions = [
+  { value: 'Sin metodo', label: 'Sin metodo' },
+  { value: 'Nequi', label: 'Nequi' },
+  { value: 'Efectivo', label: 'Efectivo' },
+  { value: 'Daviplata', label: 'Daviplata' },
+  { value: 'Transferencia', label: 'Transferencia' },
+  { value: 'Otro', label: 'Otro' },
+]
+
 const initialState = {
   customer_name: '',
   customer_phone: '',
@@ -26,6 +35,7 @@ const initialState = {
   status: 'pending',
   payment_status: 'pending',
   paid_amount: '',
+  payment_method: 'Sin metodo',
   selected_scents: [],
   notes: '',
   items: [],
@@ -75,6 +85,7 @@ export default function OrderForm({
       status: selectedOrder.status || 'pending',
       payment_status: selectedOrder.payment_status || 'pending',
       paid_amount: selectedOrder.paid_amount ?? '',
+      payment_method: selectedOrder.payment_method || 'Sin metodo',
       selected_scents: Array.isArray(selectedOrder.selected_scents)
         ? selectedOrder.selected_scents
         : [],
@@ -294,6 +305,7 @@ export default function OrderForm({
         notes: formValues.notes.trim(),
         payment_status: normalizedPaymentStatus,
         paid_amount: paidAmount,
+        payment_method: formValues.payment_method || 'Sin metodo',
         selected_scents: formValues.selected_scents,
         items: cleanItems.map((item) => ({
           ...item,
@@ -546,6 +558,22 @@ export default function OrderForm({
                 className="field-input"
               >
                 {paymentStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <Field label="Metodo de pago">
+              <select
+                value={formValues.payment_method}
+                onChange={(event) => updateValue('payment_method', event.target.value)}
+                className="field-input"
+              >
+                {paymentMethodOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

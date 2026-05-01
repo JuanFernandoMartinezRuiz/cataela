@@ -49,9 +49,11 @@ export default function AdminOrdersPage() {
         fetchActiveProductOptions(),
         fetchAvailableEssences().catch(() => []),
       ])
-      const syncResult = await syncOrdersWithFinances(orderRows).catch(() => ({
+      const syncResult = await syncOrdersWithFinances(orderRows, { missingOnly: true }).catch(() => ({
         orders: orderRows,
         createdCount: 0,
+        updatedCount: 0,
+        paymentCount: 0,
       }))
       setOrders(sortOrders(syncResult.orders))
       setProducts(productRows)
@@ -82,9 +84,10 @@ export default function AdminOrdersPage() {
           description: 'El pedido se actualizo correctamente.',
           tone: 'success',
         })
+        notifyFinanceSync(updated)
         if (updated.financeSyncError) {
           showToast({
-            title: 'Error al actualizar finanzas',
+            title: 'Error al sincronizar pago',
             description: updated.financeSyncError,
             tone: 'warning',
           })
@@ -101,9 +104,10 @@ export default function AdminOrdersPage() {
         description: 'El pedido se guardo correctamente.',
         tone: 'success',
       })
+      notifyFinanceSync(created)
       if (created.financeSyncError) {
         showToast({
-          title: 'Error al actualizar finanzas',
+          title: 'Error al sincronizar pago',
           description: created.financeSyncError,
           tone: 'warning',
         })
@@ -160,17 +164,17 @@ export default function AdminOrdersPage() {
       const syncResult = await syncOrdersWithFinances(orders)
       setOrders(sortOrders(syncResult.orders))
       showToast({
-        title: 'Pedidos sincronizados con Finanzas',
+        title: 'Pagos de pedidos sincronizados',
         description:
-          syncResult.createdCount > 0
-            ? `Se vincularon ${syncResult.createdCount} pedido(s) con Finanzas.`
+          syncResult.paymentCount > 0 || syncResult.createdCount > 0 || syncResult.updatedCount > 0
+            ? `Se revisaron ${syncResult.createdCount + syncResult.updatedCount} pedido(s) y se actualizaron ${syncResult.paymentCount} pago(s).`
             : 'No habia pedidos pendientes por sincronizar.',
         tone: 'success',
       })
     } catch (syncError) {
       setError(syncError.message || 'No fue posible sincronizar pedidos con Finanzas.')
       showToast({
-        title: 'Error al actualizar finanzas',
+        title: 'Error al sincronizar pago',
         description: syncError.message || 'No fue posible sincronizar pedidos con Finanzas.',
         tone: 'error',
       })
@@ -183,6 +187,37 @@ export default function AdminOrdersPage() {
     setSelectedOrder(order)
     setSelectedDate(order.delivery_date)
     setMonthCursor(getMonthStart(new Date(`${order.delivery_date}T00:00:00`)))
+  }
+
+  function notifyFinanceSync(order) {
+    if (order?.financeSyncError) {
+      return
+    }
+
+    if (
+      order?.financeSync?.transactionAction &&
+      ['created', 'updated'].includes(order.financeSync.transactionAction)
+    ) {
+      showToast({
+        title: 'Pedido sincronizado con Finanzas',
+        description: 'El ingreso del pedido quedo vinculado correctamente.',
+        tone: 'success',
+      })
+    }
+
+    if (
+      order?.financeSync?.paymentAction &&
+      ['created', 'updated', 'deleted'].includes(order.financeSync.paymentAction)
+    ) {
+      showToast({
+        title: 'Pago del pedido actualizado',
+        description:
+          order.financeSync.paymentAction === 'deleted'
+            ? 'El pago asociado del pedido se retiro de Finanzas.'
+            : 'El pago asociado del pedido se sincronizo correctamente.',
+        tone: 'success',
+      })
+    }
   }
 
   const ordersByDate = useMemo(() => groupOrdersByDate(orders), [orders])
@@ -209,7 +244,7 @@ export default function AdminOrdersPage() {
                 disabled={syncingFinances || loading}
                 className="btn-secondary disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {syncingFinances ? 'Sincronizando...' : 'Sincronizar pedidos con Finanzas'}
+                {syncingFinances ? 'Sincronizando...' : 'Sincronizar pagos con Finanzas'}
               </button>
               <Link to="/admin/productos" className="btn-secondary">
                 Ver catalogo admin

@@ -23,6 +23,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters'
 
 const rangeOptions = [
   { value: 'day', label: 'Dia actual' },
+  { value: 'last30', label: 'Ultimos 30 dias' },
   { value: 'week', label: 'Semana actual' },
   { value: 'month', label: 'Mes actual' },
   { value: 'year', label: 'Año actual' },
@@ -1304,21 +1305,33 @@ function buildDateRange(rangeType, customRange) {
     }
   }
 
-  if (rangeType === 'week') {
-    const day = today.getDay()
-    const offset = day === 0 ? -6 : 1 - day
+  if (rangeType === 'last30') {
     const start = new Date(today)
-    start.setDate(today.getDate() + offset)
+    start.setDate(today.getDate() - 30)
     return {
       startDate: toDateInputValue(start),
       endDate: toDateInputValue(today),
     }
   }
 
+  if (rangeType === 'week') {
+    const day = today.getDay()
+    const offset = day === 0 ? -6 : 1 - day
+    const start = new Date(today)
+    start.setDate(today.getDate() + offset)
+    const end = new Date(start)
+    end.setDate(start.getDate() + 6)
+    return {
+      startDate: toDateInputValue(start),
+      endDate: toDateInputValue(end),
+    }
+  }
+
   if (rangeType === 'year') {
+    const end = new Date(today.getFullYear(), 11, 31)
     return {
       startDate: `${today.getFullYear()}-01-01`,
-      endDate: toDateInputValue(today),
+      endDate: toDateInputValue(end),
     }
   }
 
@@ -1341,9 +1354,10 @@ function buildDateRange(rangeType, customRange) {
   }
 
   const start = new Date(today.getFullYear(), today.getMonth(), 1)
+  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0)
   return {
     startDate: toDateInputValue(start),
-    endDate: toDateInputValue(today),
+    endDate: toDateInputValue(end),
   }
 }
 

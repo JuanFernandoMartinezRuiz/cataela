@@ -11,6 +11,7 @@ const orderFields = `
   payment_status,
   total_amount,
   paid_amount,
+  payment_method,
   finance_transaction_id,
   selected_scents,
   notes,
@@ -70,6 +71,7 @@ function normalizeOrder(order) {
     ...order,
     items,
     itemsSummary: buildOrderItemsSummary(items),
+    payment_method: order.payment_method || 'Sin metodo',
     finance_transaction_id: order.finance_transaction_id || null,
     selected_scents: Array.isArray(order.selected_scents) ? order.selected_scents : [],
   }
@@ -103,9 +105,15 @@ function buildOrderFinancePayload(order) {
     paid_amount: paidAmount,
     status: deriveOrderFinanceStatus(totalAmount, paidAmount),
     transaction_date: order.delivery_date,
-    payment_method: 'Sin metodo',
+    payment_method: String(order.payment_method || '').trim() || 'Sin metodo',
     selected_scents: Array.isArray(order.selected_scents) ? order.selected_scents : [],
   }
+}
+
+function shouldCreateOrderPayment(order) {
+  const paidAmount = Number(order.paid_amount || 0)
+  const paymentMethod = String(order.payment_method || '').trim()
+  return paidAmount > 0 && paymentMethod && paymentMethod !== 'Sin metodo'
 }
 
 function sanitizeOrderItems(items) {
@@ -192,6 +200,7 @@ function sanitizeOrderPayload(payload, itemRows) {
     payment_status: paymentStatus,
     total_amount: totalAmount,
     paid_amount: paidAmount,
+    payment_method: String(payload.payment_method || '').trim() || 'Sin metodo',
     selected_scents: Array.isArray(payload.selected_scents) ? payload.selected_scents : [],
     notes: String(payload.notes || '').trim() || null,
   }
@@ -214,6 +223,7 @@ async function fetchOrderById(id) {
 async function upsertOrderFinanceTransaction(order) {
   const financePayload = buildOrderFinancePayload(order)
   let transactionId = order.finance_transaction_id || null
+  let action = 'updated'
 
   if (transactionId) {
     const { data: existingTransaction, error: fetchError } = await supabase
@@ -236,7 +246,10 @@ async function upsertOrderFinanceTransaction(order) {
         throw normalizeOrderError(updateError)
       }
 
-      return transactionId
+      return {
+        transactionId,
+        action,
+      }
     }
   }
 
@@ -262,7 +275,93 @@ async function upsertOrderFinanceTransaction(order) {
     throw normalizeOrderError(linkError)
   }
 
-  return transactionId
+  action = 'created'
+
+  return {
+    transactionId,
+    action,
+  }
+}
+
+async function syncOrderFinancePayment(transactionId, order) {
+  const { data: existingPayments, error: fetchError } = await supabase
+    .from('finance_payments')
+    .select('id')
+    .eq('transaction_id', transactionId)
+    .order('created_at', { ascending: true })
+
+  if (fetchError) {
+    throw normalizeOrderError(fetchError)
+  }
+
+  const paymentRows = existingPayments ?? []
+
+  if (!shouldCreateOrderPayment(order)) {
+    if (paymentRows.length) {
+      const idsToDelete = paymentRows.map((payment) => payment.id)
+      const { error: deleteError } = await supabase
+        .from('finance_payments')
+        .delete()
+        .in('id', idsToDelete)
+
+      if (deleteError) {
+        throw normalizeOrderError(deleteError)
+      }
+
+      return 'deleted'
+    }
+
+    return 'none'
+  }
+
+  const paymentPayload = {
+    transaction_id: transactionId,
+    amount: Number(order.paid_amount || 0),
+    payment_method: String(order.payment_method || '').trim(),
+    payment_date: getDateValue(new Date()),
+    note: `Abono pedido - ${String(order.customer_name || '').trim()}`,
+  }
+
+  if (!paymentRows.length) {
+    const { error: createError } = await supabase
+      .from('finance_payments')
+      .insert(paymentPayload)
+
+    if (createError) {
+      throw normalizeOrderError(createError)
+    }
+
+    return 'created'
+  }
+
+  const primaryPaymentId = paymentRows[0].id
+  const { error: updateError } = await supabase
+    .from('finance_payments')
+    .update({
+      amount: paymentPayload.amount,
+      payment_method: paymentPayload.payment_method,
+      payment_date: paymentPayload.payment_date,
+      note: paymentPayload.note,
+    })
+    .eq('id', primaryPaymentId)
+
+  if (updateError) {
+    throw normalizeOrderError(updateError)
+  }
+
+  if (paymentRows.length > 1) {
+    const extraIds = paymentRows.slice(1).map((payment) => payment.id)
+    const { error: cleanupError } = await supabase
+      .from('finance_payments')
+      .delete()
+      .in('id', extraIds)
+
+    if (cleanupError) {
+      throw normalizeOrderError(cleanupError)
+    }
+  }
+
+  return 'updated'
 }
 
 async function syncSingleOrderFinance(order) {
@@ -270,10 +369,16 @@ async function syncSingleOrderFinance(order) {
     throw new Error('No fue posible sincronizar el pedido con Finanzas.')
   }
 
-  const transactionId = await upsertOrderFinanceTransaction(order)
+  const { transactionId, action: transactionAction } = await upsertOrderFinanceTransaction(order)
+  const paymentAction = await syncOrderFinancePayment(transactionId, order)
+
   return {
     ...order,
     finance_transaction_id: transactionId,
+    financeSync: {
+      transactionAction,
+      paymentAction,
+    },
   }
 }
 
@@ -294,6 +399,15 @@ async function deleteOrderFinanceTransaction(order) {
 
   if (!financeTransaction?.id || financeTransaction.category !== ORDER_FINANCE_CATEGORY) {
     return
+  }
+
+  const { error: deletePaymentsError } = await supabase
+    .from('finance_payments')
+    .delete()
+    .eq('transaction_id', financeTransaction.id)
+
+  if (deletePaymentsError) {
+    throw normalizeOrderError(deletePaymentsError)
   }
 
   const { error: deleteError } = await supabase
@@ -384,7 +498,12 @@ export async function createOrder(payload) {
   const createdOrder = await fetchOrderById(data.id)
 
   try {
-    await syncSingleOrderFinance(createdOrder)
+    const syncedOrder = await syncSingleOrderFinance(createdOrder)
+    const refreshedOrder = await fetchOrderById(data.id)
+    return {
+      ...refreshedOrder,
+      financeSync: syncedOrder.financeSync,
+    }
   } catch (syncError) {
     return {
       ...createdOrder,
@@ -392,8 +511,6 @@ export async function createOrder(payload) {
         syncError.message || 'El pedido se creo, pero no fue posible sincronizar Finanzas.',
     }
   }
-
-  return fetchOrderById(data.id)
 }
 
 export async function updateOrder(id, payload) {
@@ -426,7 +543,12 @@ export async function updateOrder(id, payload) {
   const updatedOrder = await fetchOrderById(id)
 
   try {
-    await syncSingleOrderFinance(updatedOrder)
+    const syncedOrder = await syncSingleOrderFinance(updatedOrder)
+    const refreshedOrder = await fetchOrderById(id)
+    return {
+      ...refreshedOrder,
+      financeSync: syncedOrder.financeSync,
+    }
   } catch (syncError) {
     return {
       ...updatedOrder,
@@ -435,8 +557,6 @@ export async function updateOrder(id, payload) {
         'El pedido se actualizo, pero no fue posible sincronizar Finanzas.',
     }
   }
-
-  return fetchOrderById(id)
 }
 
 export async function deleteOrder(id) {
@@ -452,26 +572,38 @@ export async function deleteOrder(id) {
   }
 }
 
-export async function syncOrdersWithFinances(existingOrders = null) {
+export async function syncOrdersWithFinances(existingOrders = null, options = {}) {
   ensureSupabaseConfigured()
 
+  const { missingOnly = false } = options
   const orders = existingOrders ?? (await fetchOrders())
   let createdCount = 0
+  let updatedCount = 0
+  let paymentCount = 0
   const syncedOrders = []
 
   for (const order of orders) {
-    if (order.finance_transaction_id) {
+    if (missingOnly && order.finance_transaction_id) {
       syncedOrders.push(order)
       continue
     }
 
     const syncedOrder = await syncSingleOrderFinance(order)
     syncedOrders.push(syncedOrder)
-    createdCount += 1
+    if (syncedOrder.financeSync?.transactionAction === 'created') {
+      createdCount += 1
+    } else {
+      updatedCount += 1
+    }
+    if (['created', 'updated'].includes(syncedOrder.financeSync?.paymentAction)) {
+      paymentCount += 1
+    }
   }
 
   return {
     orders: syncedOrders,
     createdCount,
+    updatedCount,
+    paymentCount,
   }
 }
