@@ -35,9 +35,14 @@ Web dinamica hecha con React + Vite + Tailwind para el emprendimiento Cataela, c
 ```bash
 VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
 VITE_SUPABASE_ANON_KEY=tu-anon-key
+SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key
+RESEND_API_KEY=tu-resend-api-key
+ORDER_REMINDER_EMAILS=admin1@tu-dominio.com,admin2@tu-dominio.com
+CRON_SECRET=tu-cron-secret
 ```
 
 El cliente de Supabase esta en `src/lib/supabaseClient.js` y nunca quema credenciales reales en el codigo.
+Para el cron de recordatorios en Vercel, usa `SUPABASE_SERVICE_ROLE_KEY` para leer y marcar pedidos sin depender de RLS del frontend.
 
 ## Instalacion
 
@@ -113,11 +118,27 @@ alter table public.finance_transactions
 
 Para pedidos futuros, `orders` tambien debe tener:
 
+- `payment_method text not null default 'Sin metodo'`
+- `finance_transaction_id uuid references public.finance_transactions(id) on delete set null`
+- `reminder_7_days_sent boolean not null default false`
+- `reminder_1_day_sent boolean not null default false`
 - `selected_scents text[] not null default '{}'::text[]`
 
 Si tu tabla `orders` ya existia antes, ejecuta tambien:
 
 ```sql
+alter table public.orders
+  add column if not exists payment_method text not null default 'Sin metodo';
+
+alter table public.orders
+  add column if not exists finance_transaction_id uuid references public.finance_transactions(id) on delete set null;
+
+alter table public.orders
+  add column if not exists reminder_7_days_sent boolean not null default false;
+
+alter table public.orders
+  add column if not exists reminder_1_day_sent boolean not null default false;
+
 alter table public.orders
   add column if not exists selected_scents text[] not null default '{}'::text[];
 ```
@@ -258,6 +279,7 @@ Puedes adaptar las politicas segun tus roles reales de administracion.
 - `src/services/essenceService.js`: CRUD de esencias y disponibilidad de aromas
 - `src/services/financeService.js`: CRUD de ingresos, egresos y pendientes
 - `src/services/authService.js`: login, sesion y logout
+- `api/cron/order-reminders.js`: cron diario para recordatorios de pedidos con Resend
 
 Hay comentarios puntuales en los servicios donde se conectan las operaciones reales a Supabase.
 
@@ -280,5 +302,8 @@ Hay comentarios puntuales en los servicios donde se conectan las operaciones rea
 ## Notas
 
 - Si no configuras las variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, la app mostrara errores controlados al intentar usar los datos.
+- Si vas a usar recordatorios por correo, configura tambien `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `ORDER_REMINDER_EMAILS` y `CRON_SECRET` en Vercel.
+- `vercel.json` ya incluye el cron diario `0 13 * * *` apuntando a `/api/cron/order-reminders`.
+- El endpoint cron omite pedidos `delivered` y `cancelled`, y marca `reminder_7_days_sent` o `reminder_1_day_sent` solo despues de un envio exitoso.
 - Si no existen categorias en la tabla `categories`, el formulario de productos no tendra opciones para seleccionar.
 - Si quieres una separacion mas estricta de permisos admin/public, agrega politicas RLS por rol o por lista de usuarios administradores.

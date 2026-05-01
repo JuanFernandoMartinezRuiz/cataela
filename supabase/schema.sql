@@ -95,6 +95,10 @@ create table if not exists public.orders (
   payment_status text not null default 'pending' check (payment_status in ('pending', 'partial', 'paid')),
   total_amount numeric not null default 0,
   paid_amount numeric not null default 0,
+  payment_method text not null default 'Sin metodo',
+  finance_transaction_id uuid references public.finance_transactions(id) on delete set null,
+  reminder_7_days_sent boolean not null default false,
+  reminder_1_day_sent boolean not null default false,
   selected_scents text[] not null default '{}'::text[],
   notes text,
   created_at timestamptz not null default now()
@@ -140,6 +144,18 @@ alter table public.finance_transactions
 
 alter table public.finance_transactions
   add column if not exists selected_scents text[] not null default '{}'::text[];
+
+alter table public.orders
+  add column if not exists payment_method text not null default 'Sin metodo';
+
+alter table public.orders
+  add column if not exists finance_transaction_id uuid references public.finance_transactions(id) on delete set null;
+
+alter table public.orders
+  add column if not exists reminder_7_days_sent boolean not null default false;
+
+alter table public.orders
+  add column if not exists reminder_1_day_sent boolean not null default false;
 
 alter table public.orders
   add column if not exists selected_scents text[] not null default '{}'::text[];
