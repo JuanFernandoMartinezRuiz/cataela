@@ -11,6 +11,7 @@ const orderFields = `
   payment_status,
   total_amount,
   paid_amount,
+  finance_transaction_id,
   selected_scents,
   notes,
   created_at,
@@ -30,6 +31,8 @@ const orderFields = `
     )
   )
 `
+
+const ORDER_FINANCE_CATEGORY = 'Pedidos'
 
 function normalizeOrderError(error) {
   if (!error) {
@@ -67,6 +70,40 @@ function normalizeOrder(order) {
     ...order,
     items,
     itemsSummary: buildOrderItemsSummary(items),
+    finance_transaction_id: order.finance_transaction_id || null,
+    selected_scents: Array.isArray(order.selected_scents) ? order.selected_scents : [],
+  }
+}
+
+function deriveOrderFinanceStatus(totalAmount, paidAmount) {
+  const total = Number(totalAmount || 0)
+  const paid = Number(paidAmount || 0)
+
+  if (paid <= 0) {
+    return 'pending'
+  }
+
+  if (paid >= total && total > 0) {
+    return 'completed'
+  }
+
+  return 'partial'
+}
+
+function buildOrderFinancePayload(order) {
+  const totalAmount = Number(order.total_amount || 0)
+  const paidAmount = Number(order.paid_amount || 0)
+
+  return {
+    type: 'income',
+    category: ORDER_FINANCE_CATEGORY,
+    description: `Pedido - ${String(order.customer_name || '').trim()}`,
+    buyer_name: String(order.customer_name || '').trim() || null,
+    amount: totalAmount,
+    paid_amount: paidAmount,
+    status: deriveOrderFinanceStatus(totalAmount, paidAmount),
+    transaction_date: order.delivery_date,
+    payment_method: 'Sin metodo',
     selected_scents: Array.isArray(order.selected_scents) ? order.selected_scents : [],
   }
 }
@@ -174,6 +211,101 @@ async function fetchOrderById(id) {
   return normalizeOrder(data)
 }
 
+async function upsertOrderFinanceTransaction(order) {
+  const financePayload = buildOrderFinancePayload(order)
+  let transactionId = order.finance_transaction_id || null
+
+  if (transactionId) {
+    const { data: existingTransaction, error: fetchError } = await supabase
+      .from('finance_transactions')
+      .select('id')
+      .eq('id', transactionId)
+      .maybeSingle()
+
+    if (fetchError) {
+      throw normalizeOrderError(fetchError)
+    }
+
+    if (existingTransaction?.id) {
+      const { error: updateError } = await supabase
+        .from('finance_transactions')
+        .update(financePayload)
+        .eq('id', transactionId)
+
+      if (updateError) {
+        throw normalizeOrderError(updateError)
+      }
+
+      return transactionId
+    }
+  }
+
+  const { data: createdTransaction, error: createError } = await supabase
+    .from('finance_transactions')
+    .insert(financePayload)
+    .select('id')
+    .single()
+
+  if (createError) {
+    throw normalizeOrderError(createError)
+  }
+
+  transactionId = createdTransaction.id
+
+  const { error: linkError } = await supabase
+    .from('orders')
+    .update({ finance_transaction_id: transactionId })
+    .eq('id', order.id)
+
+  if (linkError) {
+    await supabase.from('finance_transactions').delete().eq('id', transactionId)
+    throw normalizeOrderError(linkError)
+  }
+
+  return transactionId
+}
+
+async function syncSingleOrderFinance(order) {
+  if (!order?.id) {
+    throw new Error('No fue posible sincronizar el pedido con Finanzas.')
+  }
+
+  const transactionId = await upsertOrderFinanceTransaction(order)
+  return {
+    ...order,
+    finance_transaction_id: transactionId,
+  }
+}
+
+async function deleteOrderFinanceTransaction(order) {
+  if (!order?.finance_transaction_id) {
+    return
+  }
+
+  const { data: financeTransaction, error: fetchError } = await supabase
+    .from('finance_transactions')
+    .select('id, category')
+    .eq('id', order.finance_transaction_id)
+    .maybeSingle()
+
+  if (fetchError) {
+    throw normalizeOrderError(fetchError)
+  }
+
+  if (!financeTransaction?.id || financeTransaction.category !== ORDER_FINANCE_CATEGORY) {
+    return
+  }
+
+  const { error: deleteError } = await supabase
+    .from('finance_transactions')
+    .delete()
+    .eq('id', financeTransaction.id)
+
+  if (deleteError) {
+    throw normalizeOrderError(deleteError)
+  }
+}
+
 async function replaceOrderItems(orderId, items) {
   const { error: deleteError } = await supabase
     .from('order_items')
@@ -249,6 +381,18 @@ export async function createOrder(payload) {
     throw nestedError
   }
 
+  const createdOrder = await fetchOrderById(data.id)
+
+  try {
+    await syncSingleOrderFinance(createdOrder)
+  } catch (syncError) {
+    return {
+      ...createdOrder,
+      financeSyncError:
+        syncError.message || 'El pedido se creo, pero no fue posible sincronizar Finanzas.',
+    }
+  }
+
   return fetchOrderById(data.id)
 }
 
@@ -279,15 +423,55 @@ export async function updateOrder(id, payload) {
     throw normalizeOrderError(error)
   }
 
+  const updatedOrder = await fetchOrderById(id)
+
+  try {
+    await syncSingleOrderFinance(updatedOrder)
+  } catch (syncError) {
+    return {
+      ...updatedOrder,
+      financeSyncError:
+        syncError.message ||
+        'El pedido se actualizo, pero no fue posible sincronizar Finanzas.',
+    }
+  }
+
   return fetchOrderById(id)
 }
 
 export async function deleteOrder(id) {
   ensureSupabaseConfigured()
 
+  const existingOrder = await fetchOrderById(id)
+  await deleteOrderFinanceTransaction(existingOrder)
+
   const { error } = await supabase.from('orders').delete().eq('id', id)
 
   if (error) {
     throw normalizeOrderError(error)
+  }
+}
+
+export async function syncOrdersWithFinances(existingOrders = null) {
+  ensureSupabaseConfigured()
+
+  const orders = existingOrders ?? (await fetchOrders())
+  let createdCount = 0
+  const syncedOrders = []
+
+  for (const order of orders) {
+    if (order.finance_transaction_id) {
+      syncedOrders.push(order)
+      continue
+    }
+
+    const syncedOrder = await syncSingleOrderFinance(order)
+    syncedOrders.push(syncedOrder)
+    createdCount += 1
+  }
+
+  return {
+    orders: syncedOrders,
+    createdCount,
   }
 }

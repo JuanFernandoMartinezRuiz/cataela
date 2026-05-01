@@ -1056,7 +1056,9 @@ function filterTransactions(transactions, typeFilter, statusFilter, categoryFilt
     const matchesCategory =
       categoryFilter === 'all'
         ? true
-        : String(transaction.category || 'Sin categoria') === categoryFilter
+        : categoryFilter === 'Ventas'
+          ? ['Ventas', 'Pedidos'].includes(String(transaction.category || 'Sin categoria'))
+          : String(transaction.category || 'Sin categoria') === categoryFilter
     return matchesType && matchesStatus && matchesCategory
   })
 }

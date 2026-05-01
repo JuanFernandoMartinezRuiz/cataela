@@ -9,7 +9,13 @@ import StatusBadge from '../../components/common/StatusBadge'
 import { useToast } from '../../providers/ToastProvider'
 import { fetchAvailableEssences } from '../../services/essenceService'
 import { fetchActiveProductOptions } from '../../services/productService'
-import { createOrder, deleteOrder, fetchOrders, updateOrder } from '../../services/orderService'
+import {
+  createOrder,
+  deleteOrder,
+  fetchOrders,
+  syncOrdersWithFinances,
+  updateOrder,
+} from '../../services/orderService'
 import { formatCurrency } from '../../utils/formatters'
 import { formatDate, getDateValue } from '../../utils/date'
 
@@ -27,6 +33,7 @@ export default function AdminOrdersPage() {
   const [saving, setSaving] = useState(false)
   const [saveLabel, setSaveLabel] = useState('')
   const [deletingId, setDeletingId] = useState('')
+  const [syncingFinances, setSyncingFinances] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -42,7 +49,11 @@ export default function AdminOrdersPage() {
         fetchActiveProductOptions(),
         fetchAvailableEssences().catch(() => []),
       ])
-      setOrders(sortOrders(orderRows))
+      const syncResult = await syncOrdersWithFinances(orderRows).catch(() => ({
+        orders: orderRows,
+        createdCount: 0,
+      }))
+      setOrders(sortOrders(syncResult.orders))
       setProducts(productRows)
       setScents(scentRows)
     } catch (loadError) {
@@ -71,6 +82,13 @@ export default function AdminOrdersPage() {
           description: 'El pedido se actualizo correctamente.',
           tone: 'success',
         })
+        if (updated.financeSyncError) {
+          showToast({
+            title: 'Error al actualizar finanzas',
+            description: updated.financeSyncError,
+            tone: 'warning',
+          })
+        }
         return
       }
 
@@ -83,6 +101,13 @@ export default function AdminOrdersPage() {
         description: 'El pedido se guardo correctamente.',
         tone: 'success',
       })
+      if (created.financeSyncError) {
+        showToast({
+          title: 'Error al actualizar finanzas',
+          description: created.financeSyncError,
+          tone: 'warning',
+        })
+      }
     } catch (submitError) {
       setError(submitError.message || 'No fue posible guardar el pedido.')
       showToast({
@@ -128,6 +153,32 @@ export default function AdminOrdersPage() {
     }
   }
 
+  async function handleSyncOrders() {
+    try {
+      setSyncingFinances(true)
+      setError('')
+      const syncResult = await syncOrdersWithFinances(orders)
+      setOrders(sortOrders(syncResult.orders))
+      showToast({
+        title: 'Pedidos sincronizados con Finanzas',
+        description:
+          syncResult.createdCount > 0
+            ? `Se vincularon ${syncResult.createdCount} pedido(s) con Finanzas.`
+            : 'No habia pedidos pendientes por sincronizar.',
+        tone: 'success',
+      })
+    } catch (syncError) {
+      setError(syncError.message || 'No fue posible sincronizar pedidos con Finanzas.')
+      showToast({
+        title: 'Error al actualizar finanzas',
+        description: syncError.message || 'No fue posible sincronizar pedidos con Finanzas.',
+        tone: 'error',
+      })
+    } finally {
+      setSyncingFinances(false)
+    }
+  }
+
   function handleEdit(order) {
     setSelectedOrder(order)
     setSelectedDate(order.delivery_date)
@@ -151,9 +202,19 @@ export default function AdminOrdersPage() {
           title="Calendario interno de entregas"
           description="Organiza entregas futuras, pedidos por fecha y seguimiento comercial sin mezclarlo todavia con Finanzas."
           actions={
-            <Link to="/admin/productos" className="btn-secondary">
-              Ver catalogo admin
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handleSyncOrders}
+                disabled={syncingFinances || loading}
+                className="btn-secondary disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {syncingFinances ? 'Sincronizando...' : 'Sincronizar pedidos con Finanzas'}
+              </button>
+              <Link to="/admin/productos" className="btn-secondary">
+                Ver catalogo admin
+              </Link>
+            </div>
           }
         />
       </div>
