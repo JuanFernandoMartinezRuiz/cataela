@@ -10,7 +10,7 @@ import { useToast } from '../../providers/ToastProvider'
 import { fetchAvailableEssences } from '../../services/essenceService'
 import { fetchActiveProductOptions } from '../../services/productService'
 import { createOrder, deleteOrder, fetchOrders, updateOrder } from '../../services/orderService'
-import { formatCurrency, formatDate } from '../../utils/formatters'
+import { formatCurrency } from '../../utils/formatters'
 
 const weekdayLabels = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom']
 
@@ -268,7 +268,7 @@ export default function AdminOrdersPage() {
               <section className="admin-panel p-6">
                 <div className="flex flex-col gap-2">
                   <h2 className="font-display text-3xl text-slate-700">
-                    Pedidos del {formatDate(selectedDate)}
+                    Pedidos del {formatOrderDate(selectedDate)}
                   </h2>
                   <p className="text-sm text-slate-500">
                     Vista puntual del dia seleccionado en el calendario.
@@ -358,7 +358,7 @@ function OrderCard({ order, deleting, onEdit, onDelete }) {
             </StatusBadge>
           </div>
           <p className="mt-2 text-sm text-slate-500">
-            {formatDate(order.delivery_date)}
+            {formatOrderDate(order.delivery_date)}
             {order.delivery_time ? ` · ${formatTime(order.delivery_time)}` : ''}
           </p>
           {order.delivery_address ? (
@@ -578,7 +578,7 @@ function buildOrderWhatsAppLink(order) {
     return '#'
   }
 
-  const intro = `Hola ${order.customer_name}, te confirmamos tu pedido para el ${formatDate(order.delivery_date)}${order.delivery_time ? ` a las ${formatTime(order.delivery_time)}` : ''}.`
+  const intro = `Hola ${order.customer_name}, te confirmamos tu pedido para el ${formatOrderDate(order.delivery_date)}${order.delivery_time ? ` a las ${formatTime(order.delivery_time)}` : ''}.`
   const productLines = (order.items ?? [])
     .map((item) => `- ${item.product_name} x ${item.quantity}`)
     .join('\n')
@@ -619,7 +619,7 @@ function formatTime(value) {
 }
 
 function getTodayDate() {
-  return new Date().toISOString().slice(0, 10)
+  return toDateKey(new Date())
 }
 
 function getMonthStart(date) {
@@ -631,9 +631,10 @@ function shiftMonth(date, delta) {
 }
 
 function toDateKey(date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 10)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function formatMonthYear(date) {
@@ -641,4 +642,18 @@ function formatMonthYear(date) {
     month: 'long',
     year: 'numeric',
   }).format(date)
+}
+
+function formatOrderDate(dateString) {
+  if (!dateString) {
+    return 'Sin fecha'
+  }
+
+  const [year, month, day] = String(dateString).split('-')
+
+  if (!year || !month || !day) {
+    return dateString
+  }
+
+  return `${day}/${month}/${year}`
 }
