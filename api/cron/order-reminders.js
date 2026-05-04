@@ -69,6 +69,8 @@ export default async function handler(req, res) {
 
       const result = await sendEmail({
         resend,
+        from: 'Cataela <notificaciones@cataela.com>',
+        replyTo: config.orderReplyToEmail,
         recipients: [testRecipient],
         subject,
         text,
@@ -101,6 +103,8 @@ export default async function handler(req, res) {
     for (const order of sevenDayOrders) {
       const sent = await sendOrderReminder({
         resend,
+        from: 'Cataela <notificaciones@cataela.com>',
+        replyTo: config.orderReplyToEmail,
         recipients,
         order,
         daysAhead: 7,
@@ -117,6 +121,8 @@ export default async function handler(req, res) {
     for (const order of oneDayOrders) {
       const sent = await sendOrderReminder({
         resend,
+        from: 'Cataela <notificaciones@cataela.com>',
+        replyTo: config.orderReplyToEmail,
         recipients,
         order,
         daysAhead: 1,
@@ -138,7 +144,7 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('order-reminders error:', error)
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       ok: false,
       error: error.message || 'Unexpected error sending order reminders.',
     })
@@ -163,6 +169,8 @@ function isAuthorized(req) {
 function getServerConfig() {
   const resendApiKey = process.env.RESEND_API_KEY
   const orderReminderEmails = process.env.ORDER_REMINDER_EMAILS
+  const orderReplyToEmail =
+    process.env.ORDER_REPLY_TO_EMAIL || parseRecipients(orderReminderEmails)[0] || ''
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
   const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -184,6 +192,7 @@ function getServerConfig() {
 
   return {
     resendApiKey,
+    orderReplyToEmail,
     supabaseUrl,
     supabaseServiceRoleKey,
   }
@@ -217,7 +226,7 @@ async function markReminderSent(supabase, orderId, reminderField) {
   }
 }
 
-async function sendOrderReminder({ resend, recipients, order, daysAhead }) {
+async function sendOrderReminder({ resend, from, replyTo, recipients, order, daysAhead }) {
   if (!recipients.length) {
     return false
   }
@@ -277,6 +286,8 @@ async function sendOrderReminder({ resend, recipients, order, daysAhead }) {
 
   await sendEmail({
     resend,
+    from,
+    replyTo,
     recipients,
     subject,
     text,
@@ -293,13 +304,15 @@ function parseRecipients(value) {
     .filter(Boolean)
 }
 
-async function sendEmail({ resend, recipients, subject, text, html }) {
+async function sendEmail({ resend, from, replyTo, recipients, subject, text, html }) {
+  console.log('Resend from:', from)
   console.log('Resend recipients:', recipients)
   console.log('Resend subject:', subject)
 
   try {
     const result = await resend.emails.send({
-      from: 'Cataela <onboarding@resend.dev>',
+      from,
+      reply_to: replyTo,
       to: recipients,
       subject,
       text,
@@ -307,6 +320,16 @@ async function sendEmail({ resend, recipients, subject, text, html }) {
     })
 
     console.log('Resend result:', result)
+
+    if (result?.error) {
+      const resendError = new Error(result.error.message || 'Resend rechazo el envio del correo.')
+      resendError.statusCode =
+        result.error.statusCode ||
+        (typeof result.error.status_code === 'number' ? result.error.status_code : 500)
+      console.error('Resend send error:', result.error)
+      throw resendError
+    }
+
     return result
   } catch (error) {
     console.error('Resend send error:', error)
