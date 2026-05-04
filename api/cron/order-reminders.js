@@ -42,12 +42,11 @@ export default async function handler(req, res) {
     const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey)
     const resend = new Resend(process.env.RESEND_API_KEY)
     const recipients = parseRecipients(process.env.ORDER_REMINDER_EMAILS)
+    console.log('Recipients:', recipients)
 
     if (isTestMode) {
-      const testRecipient = recipients[0]
-
-      if (!testRecipient) {
-        throw new Error('No hay un correo disponible en ORDER_REMINDER_EMAILS para la prueba.')
+      if (!recipients.length) {
+        throw new Error('No hay correos disponibles en ORDER_REMINDER_EMAILS para la prueba.')
       }
 
       const subject = 'Test correo Cataela'
@@ -71,7 +70,7 @@ export default async function handler(req, res) {
         resend,
         from: 'Cataela <notificaciones@cataela.com>',
         replyTo: config.orderReplyToEmail,
-        recipients: [testRecipient],
+        recipients,
         subject,
         text,
         html,
@@ -81,7 +80,7 @@ export default async function handler(req, res) {
         ok: true,
         message: 'Correo enviado correctamente',
         test: true,
-        recipient: testRecipient,
+        recipients,
         result,
       })
     }
