@@ -1144,11 +1144,26 @@ function compareTransactionDate(left, right) {
 }
 
 function buildFinanceSummary(transactions, activeRange) {
-  return transactions.reduce(
+  const orderStats = {
+    totalTransactions: transactions.length,
+    paidOrdersIncluded: 0,
+    pendingOrdersIncluded: 0,
+  }
+
+  const summary = transactions.reduce(
     (summary, transaction) => {
       const amount = Number(transaction.amount || 0)
       const paidAmount = getEffectivePaidAmount(transaction, activeRange)
       const remainingAmount = Math.max(0, amount - paidAmount)
+      const isOrderTransaction = String(transaction.category || '') === 'Pedidos'
+
+      if (isOrderTransaction) {
+        if (paidAmount > 0) {
+          orderStats.paidOrdersIncluded += 1
+        } else {
+          orderStats.pendingOrdersIncluded += 1
+        }
+      }
 
       if (transaction.type === 'income') {
         summary.totalIncomeExpected += amount
@@ -1183,6 +1198,12 @@ function buildFinanceSummary(transactions, activeRange) {
       pendingPayables: 0,
     },
   )
+
+  console.log('Finance summary transaction count:', orderStats.totalTransactions)
+  console.log('Finance summary paid orders included:', orderStats.paidOrdersIncluded)
+  console.log('Finance summary pending orders included:', orderStats.pendingOrdersIncluded)
+
+  return summary
 }
 
 function buildPaymentMethodSummary(transactions, activeRange) {
@@ -1190,9 +1211,13 @@ function buildPaymentMethodSummary(transactions, activeRange) {
     accumulator[method] = 0
     return accumulator
   }, {})
+  let orderPaymentsIncluded = 0
 
   transactions.forEach((transaction) => {
-    getPaymentsInRange(transaction, activeRange).forEach((payment) => {
+    getPaymentsForSummary(transaction, activeRange).forEach((payment) => {
+      if (String(transaction.category || '') === 'Pedidos') {
+        orderPaymentsIncluded += 1
+      }
       const method = normalizePaymentMethod(payment.payment_method)
       const signedAmount =
         transaction.type === 'expense'
@@ -1201,6 +1226,8 @@ function buildPaymentMethodSummary(transactions, activeRange) {
       summary[method] += signedAmount
     })
   })
+
+  console.log('Finance payment method order payments included:', orderPaymentsIncluded)
 
   return summary
 }
@@ -1262,8 +1289,18 @@ function getPaymentsInRange(transaction, activeRange) {
   )
 }
 
+function getPaymentsForSummary(transaction, activeRange) {
+  const allPayments = transaction.payments ?? []
+
+  if (String(transaction.category || '') === 'Pedidos' && allPayments.length > 0) {
+    return allPayments
+  }
+
+  return getPaymentsInRange(transaction, activeRange)
+}
+
 function getEffectivePaidAmount(transaction, activeRange) {
-  const paymentsInRange = getPaymentsInRange(transaction, activeRange)
+  const paymentsInRange = getPaymentsForSummary(transaction, activeRange)
   const hasLinkedPayments = (transaction.payments ?? []).length > 0
 
   if (hasLinkedPayments) {
